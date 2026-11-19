@@ -64,7 +64,7 @@ describe('workspace modes', () => {
 
   it('shows only the editor in Edit Mode', async () => {
     await openFromClipboard();
-    expect(screen.getByLabelText('Markdown source editor')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Markdown source editor')).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Rendered document' })).toBeNull();
   });
 
@@ -84,7 +84,7 @@ describe('workspace modes', () => {
     fireEvent.keyDown(window, { key: '3', ctrlKey: true });
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Markdown source editor')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Markdown source editor')).not.toBeNull();
       expect(screen.getByRole('region', { name: 'Rendered document' })).toBeInTheDocument();
     });
   });
@@ -100,7 +100,7 @@ describe('workspace modes', () => {
 
   it('preserves unsaved edits across every mode transition', async () => {
     await openFromClipboard('# Original\n');
-    const editor = screen.getByLabelText('Markdown source editor');
+    const editor = await screen.findByLabelText('Markdown source editor');
 
     fireEvent.change(editor, { target: { value: '# Edited\n\nEdited body\n' } });
 
@@ -112,7 +112,7 @@ describe('workspace modes', () => {
       });
     }
 
-    expect(screen.getByLabelText('Markdown source editor')).toHaveValue('# Edited\n\nEdited body\n');
+    expect(await screen.findByLabelText('Markdown source editor')).toHaveValue('# Edited\n\nEdited body\n');
   });
 });
 
@@ -126,7 +126,7 @@ describe('tabs and dirty state', () => {
 
     expect(screen.queryByLabelText('Unsaved changes')).toBeNull();
 
-    fireEvent.change(screen.getByLabelText('Markdown source editor'), {
+    fireEvent.change(await screen.findByLabelText('Markdown source editor'), {
       target: { value: 'changed' },
     });
 
@@ -146,15 +146,15 @@ describe('tabs and dirty state', () => {
     expect(tabs).toHaveLength(2);
 
     fireEvent.click(tabs[0]!);
-    fireEvent.change(screen.getByLabelText('Markdown source editor'), {
+    fireEvent.change(await screen.findByLabelText('Markdown source editor'), {
       target: { value: '# A edited\n' },
     });
 
     fireEvent.click(tabs[1]!);
-    expect(screen.getByLabelText('Markdown source editor')).toHaveValue('# B\n');
+    expect(await screen.findByLabelText('Markdown source editor')).toHaveValue('# B\n');
 
     fireEvent.click(tabs[0]!);
-    expect(screen.getByLabelText('Markdown source editor')).toHaveValue('# A edited\n');
+    expect(await screen.findByLabelText('Markdown source editor')).toHaveValue('# A edited\n');
   });
 
   it('asks before discarding unsaved changes', async () => {
@@ -162,7 +162,7 @@ describe('tabs and dirty state', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
     await screen.findByRole('tab', { name: /Pasted document/ });
 
-    fireEvent.change(screen.getByLabelText('Markdown source editor'), {
+    fireEvent.change(await screen.findByLabelText('Markdown source editor'), {
       target: { value: 'changed' },
     });
 
@@ -218,7 +218,7 @@ describe('saving', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(await screen.findByText(/Save failed: disk is full/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Markdown source editor')).toHaveValue('content');
+    expect(await screen.findByLabelText('Markdown source editor')).toHaveValue('content');
     expect(platform.files.size).toBe(0);
   });
 });

@@ -172,4 +172,24 @@ describe('KaTeX font inlining', () => {
     expect(embedded).toBe(0);
     expect(output).toBe(css);
   });
+
+  it('drops woff and ttf sources that would 404 in an exported file', () => {
+    const css =
+      'src:url(fonts/A.woff2) format("woff2"),url(fonts/A.woff) format("woff"),url(fonts/A.ttf) format("truetype")';
+    const { css: output, embedded } = inlineKatexFonts(css, {
+      'A.woff2': 'data:font/woff2;base64,AAAA',
+    });
+
+    expect(embedded).toBe(1);
+    expect(output).toContain('data:font/woff2;base64,AAAA');
+    expect(output).not.toContain('.woff)');
+    expect(output).not.toContain('.ttf)');
+    expect(output).not.toContain('fonts/A');
+  });
+
+  it('removes every relative font reference from the real KaTeX stylesheet', () => {
+    const { css, embedded } = inlineKatexFonts(KATEX_CSS, KATEX_FONTS);
+    expect(embedded).toBeGreaterThan(0);
+    expect(css).not.toMatch(/url\(["']?fonts\//);
+  });
 });

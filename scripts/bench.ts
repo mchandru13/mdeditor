@@ -57,8 +57,8 @@ function buildDocument(targetBytes: number): string {
 
 interface Measurement {
   bytes: number;
-  runs: { parse: number; transform: number; sanitize: number; total: number }[];
-  median: { parse: number; transform: number; sanitize: number; total: number };
+  runs: { parse: number; transform: number; sanitize: number; post: number; total: number }[];
+  median: { parse: number; transform: number; sanitize: number; post: number; total: number };
   minTotal: number;
   heapDeltaMb: number;
   headings: number;
@@ -97,6 +97,7 @@ function measure(source: string, runs = 3): Measurement {
       parse: median(results.map((run) => run.parse)),
       transform: median(results.map((run) => run.transform)),
       sanitize: median(results.map((run) => run.sanitize)),
+      post: median(results.map((run) => run.post)),
       total: median(results.map((run) => run.total)),
     },
     minTotal: Math.min(...results.map((run) => run.total)),
@@ -145,6 +146,7 @@ function main(): void {
         `  parse      ${format(result.median.parse)}`,
         `  transform  ${format(result.median.transform)}`,
         `  sanitize   ${format(result.median.sanitize)}`,
+        `  post       ${format(result.median.post)}`,
         `  total      ${format(result.median.total)} (best ${format(result.minTotal)})`,
         `  heap delta ${result.heapDeltaMb} MB`,
         '',

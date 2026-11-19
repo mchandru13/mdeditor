@@ -84,7 +84,17 @@ export function inlineKatexFonts(css: string, fonts: Record<string, string>): { 
     return `url(${quote}${dataUrl}${quote})`;
   });
 
-  return { css: rewritten, embedded };
+  // The stylesheet lists woff2, woff and ttf sources. Only woff2 is embedded, so
+  // the remaining relative URLs would 404 from an exported file; drop those
+  // sources instead of shipping dead references.
+  const withoutDeadSources = rewritten
+    .replace(
+      /,\s*url\((["']?)fonts\/[^)"']+\.(?:woff|ttf|otf)\1\)\s*(?:format\((["'])[^)]*\2\))?/g,
+      '',
+    )
+    .replace(/url\((["']?)fonts\/[^)"']+\.(?:woff|ttf|otf)\1\)\s*(?:format\([^)]*\))?/g, '');
+
+  return { css: withoutDeadSources, embedded };
 }
 
 function escapeHtml(value: string): string {

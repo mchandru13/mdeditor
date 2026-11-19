@@ -39,8 +39,8 @@ Windows bundles are generated for **NSIS** (`.exe`) and **WiX** (`.msi`). Verifi
 | Artifact | Size |
 |---|---|
 | `src-tauri/target/release/mdeditor.exe` | 13.1 MiB |
-| `src-tauri/target/release/bundle/nsis/Markdown Editor_1.0.0_x64-setup.exe` | 10.2 MiB |
-| `src-tauri/target/release/bundle/msi/Markdown Editor_1.0.0_x64_en-US.msi` | 10.8 MiB |
+| `src-tauri/target/release/bundle/nsis/Markdown Editor_1.0.0_x64-setup.exe` | 10.1 MiB |
+| `src-tauri/target/release/bundle/msi/Markdown Editor_1.0.0_x64_en-US.msi` | 10.7 MiB |
 
 Icons live in `src-tauri/icons/` and are generated from `app-icon.png` with `npx tauri icon app-icon.png`.
 
@@ -130,6 +130,7 @@ Key decisions:
 
 - **Markdown runs in a Web Worker.** `useDocumentRender` debounces the source (150 ms in Split Mode, 500 ms above 1 MB) and drops stale results by request id, so a slow render can never overwrite a newer one or leak into another tab. If the worker cannot start or crashes, rendering degrades to the main thread instead of leaving the preview blank; `tests/unit/renderClient.test.ts` covers that path.
 - **Two-stage rendering.** The pipeline emits HAST with placeholders for math and diagrams. Sanitization runs before any KaTeX or Mermaid rendering, and neither library ever receives document-supplied HTML.
+- **Bundle discipline.** Only 22 syntax-highlighting grammars are registered (instead of lowlight's common bundle), Mermaid and KaTeX are dynamic imports, and CodeMirror is lazy-loaded because Read Mode never needs it. Initial JS is 614 kB (195 kB gzip).
 - **Rust owns durability.** `settings.json` is written atomically in the app data directory, corrupted files are backed up as `settings.corrupt-<timestamp>.json`, and invalid or future versions are ignored rather than overwritten.
 - **Encoding fidelity.** Files are read as UTF-8; a BOM is detected and restored on save, and the dominant newline style is preserved per document. Round-trip behaviour is covered by Rust and TypeScript tests.
 - **Large documents.** Parsing is chunked above 64 KB (see Performance). Preview stops auto-rendering above 2 MB, Mermaid and KaTeX are disabled above 1 MB, and files over 20 MB are refused.
@@ -151,28 +152,37 @@ The adversarial corpus in `tests/unit/security.test.ts` covers script tags, even
 
 ### Method
 
-`npm run bench` builds deterministic 200 KB and 5 MB fixtures (headings, tables, task lists, code fences, math, Mermaid, blockquotes) and measures the pipeline stages that run off the main thread. Parsing, transform and sanitization are reported separately; **browser paint and React commit are not measured by this script**.
+`npm run bench` builds deterministic 200 KB and 5 MB fixtures (headings, tables, task lists, code fences, math, Mermaid, blockquotes) and measures the pipeline stages that run off the main thread. **Browser paint and React commit are not measured by this script.**
 
 Measured on: 11th Gen Intel Core i5-11320H, 8 cores, 16 GB RAM, Windows, Node 24.13.0, three runs per fixture, median reported.
 
-| Fixture | Parse | Transform | Sanitize | Total |
-|---|---|---|---|---|
-| 200 KB (340 headings) | 333 ms | 116 ms | 13 ms | **614–626 ms** |
-| 5 MB (8,508 headings) | 16,159 ms | 5,299 ms | 606 ms | **30.4 s** |
+| Fixture | Parse | Transform (highlight) | Sanitize | Post-process | Total |
+|---|---|---|---|---|---|
+| 200 KB (340 headings) | 315 ms | 96 ms | 10 ms | 58 ms | **491 ms** (best 481) |
+| 5 MB (8,508 headings) | 14,947 ms | 4,834 ms | 553 ms | 2,708 ms | **23.6 s** (best 22.5 s) |
 
 These fixtures are deliberately dense: roughly 340 code fences, 340 Mermaid blocks and 680 math expressions in 200 KB.
 
 ### What the numbers mean
 
-- **The 300 ms target for 200 KB is not met.** The pipeline alone takes ~614 ms on this machine. The remaining cost after parsing is syntax highlighting of hundreds of code blocks. This is reported rather than worked around by removing features.
-- **Micromark is superlinear in block containers.** A 256 KB file of blockquotes takes ~8.7 s unchunked versus ~0.9 s in 32 KB chunks (0.4 s at 64 KB). The pipeline therefore parses documents above 64 KB in 16 KB chunks at blank-line boundaries. The trade-off: a list or blockquote that spans a chunk boundary renders as two adjacent blocks. Chunking cut the 5 MB case from 229 s to 30 s and the 200 KB case from 3.4 s to 0.61 s.
+- **The 300 ms target for 200 KB is still not met** — the pipeline takes ~491 ms, down from ~614 ms after three changes: post-processing (resource rewriting, heading ids, statistics) now runs as one traversal instead of four (−~100 ms), only 22 grammars are registered for highlighting instead of lowlight's common bundle, and the editor is lazy-loaded so initial JS dropped from 1,136 kB (376 kB gzip) to 614 kB (195 kB gzip). Parsing alone is ~315 ms, which is micromark's throughput on this machine; closing the remaining gap would need incremental parsing across edits.
+- **Micromark is superlinear in block containers.** A 256 KB file of blockquotes takes ~8.7 s unchunked versus ~0.9 s in 32 KB chunks (0.4 s at 64 KB). The pipeline therefore parses documents above 64 KB in 16 KB chunks at blank-line boundaries. Lists and blockquotes are never split (asserted in `tests/unit/chunking.test.ts`), and reference/footnote definitions are copied into every chunk so links still resolve across boundaries. Chunking cut the 5 MB case from 229 s to 24 s.
 - **Large documents are gated, not silently slow.** Above 2 MB the preview is paused with a "Render preview" button; above 1 MB highlighting, math and diagrams are replaced by plain placeholders; above 20 MB the file is refused.
-- **Lighthouse was not run.** It audits a URL, and the desktop application is not served over one. Running it against `npm run preview` would measure the browser fallback shell with no document loaded, which says nothing about the desktop build, so no score is claimed.
+
+### Lighthouse
+
+Lighthouse 12 was run against the production bundle (`npm run preview`) in headless Edge with its default mobile emulation:
+
+| Score | FCP | LCP | TBT | CLS | Speed Index |
+|---|---|---|---|---|---|
+| **97** | 2.0 s | 2.0 s | 60 ms | 0 | 2.0 s |
+
+Lighthouse cannot interact with the application, so this measures the **empty workspace shell**, not a rendered document; the desktop build is not served over a URL at all. The score is a check on bundle weight and startup, and is reported with that boundary in mind.
 
 ## Testing
 
 ```bash
-npm test        # 148 tests (Vitest + React Testing Library, jsdom)
+npm test        # 171 tests (Vitest + React Testing Library, jsdom)
 npm run test:rust  # 21 tests (cargo test)
 ```
 
@@ -200,7 +210,7 @@ npm run tauri:build      # then
 npm run check:app        # attaches to the packaged app over CDP and opens a remote document
 ```
 
-`check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, the TOC, and zero page errors. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, opens a real HTTPS Markdown document through the Rust fetch command, and asserts the same rendering surface inside the actual desktop webview.
+`check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, the TOC, and zero page errors. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
 
 `check:ui` needs Edge installed and a running preview server; `check:app` needs a release build and network access for the remote document.
 
@@ -228,25 +238,27 @@ Everything below was executed on the reference machine (11th Gen Intel Core i5-1
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 155 passed |
+| Unit and integration tests | `npm test` | 171 passed |
 | Native tests | `npm run test:rust` | 23 passed |
 | Browser rendering check | `npm run check:ui` | 17/17 assertions passed against the production bundle |
-| Packaged app rendering check | `npm run check:app` | 9/9 assertions passed inside WebView2 with a remote document |
-| Desktop release build | `npm run tauri:build` | passed; NSIS 10.2 MiB and MSI 10.8 MiB |
+| Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
+| Desktop release build | `npm run tauri:build` | passed; NSIS and MSI installers produced |
 | Packaged app boot | run `src-tauri/target/release/mdeditor.exe` | process stayed alive, React mounted, and `%APPDATA%\com.rea.mdeditor\settings.json` was written through IPC with the expected defaults |
-| Benchmark | `npm run bench` | see Performance: 200 KB in ~614 ms of pipeline time, 5 MB in ~30 s |
+| Benchmark | `npm run bench` | see Performance: 200 KB in ~491 ms of pipeline time, 5 MB in ~24 s |
+| Lighthouse (production bundle) | `npx lighthouse http://localhost:4173` | performance 97 on the empty shell (see the caveat in Performance) |
 
 The boot check is what confirms the CSP, the bundled scripts, the platform layer and the Rust command round-trip actually work in WebView2; the rest of the native surface (dialogs, drag-and-drop, printing) is covered by the manual checklist above.
 
 ## Known limitations
 
-- Chunked parsing can split a list or blockquote that spans a chunk boundary in documents above 64 KB.
+- Chunked parsing replicates reference and footnote definitions into every chunk, so a document with many definitions does slightly more parsing work per chunk. Lists and blockquotes are never split.
 - Syntax highlighting of very dense documents dominates render time; there is no incremental highlighting across edits yet.
 - Export renders Mermaid diagrams with Mermaid's own renderer; a diagram that fails to render keeps its source block and is counted in the export report.
 - Editing a remote document and saving writes a local copy through Save As; the remote URL is never written back.
 - Session restore reads file contents lazily: only the active tab is loaded at start, others load when selected. A moved or deleted file is marked missing rather than recreated.
-- The 200 KB performance target is missed (see above). The 5 MB case is not interactive by design; the preview is opt-in.
-- No auto-update, code signing or installer branding beyond the generated icon.
+- The 200 KB performance target is missed (~491 ms of pipeline time, see above). The 5 MB case is not interactive by design; the preview is opt-in.
+- `npm audit` reports three low-severity advisories with no upstream fix published: KaTeX prototype pollution that can bypass trust restrictions, and the `remark-math` / `micromark-extension-math` chain that depends on it. KaTeX renders with `trust: false` and the application never passes document values into its options, which limits exposure; upgrade when fixed releases exist.
+- No auto-update or code signing. The installer carries publisher metadata, but Windows will show an unknown-publisher warning until a certificate is configured.
 
 ## Troubleshooting
 

@@ -26,7 +26,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import remarkRehype from 'remark-rehype';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
-import rehypeHighlight from 'rehype-highlight';
+import { rehypeTrimmedHighlight } from './highlight';
 import { visit } from 'unist-util-visit';
 import { toString } from 'mdast-util-to-string';
 import type { Element, Root as HastRoot, Text } from 'hast';
@@ -148,60 +148,12 @@ function rehypeMermaidPlaceholders() {
 
 function applyHighlight(tree: HastRoot): HastRoot {
   try {
-    return unified()
-      .use(rehypeHighlight, { detect: false })
-      .runSync(tree) as HastRoot;
+    rehypeTrimmedHighlight()(tree);
+    return tree;
   } catch {
-    // Unknown language or a highlight.js failure must never break the document.
+    // A highlight.js failure must never break the document.
     return tree;
   }
-}
-
-function rewriteResources(tree: HastRoot, options: RenderOptions): void {
-  visit(tree, 'element', (node: Element) => {
-    if (node.tagName !== 'img' && node.tagName !== 'a') return;
-    const key = node.tagName === 'img' ? 'src' : 'href';
-    const value = node.properties?.[key];
-    if (typeof value !== 'string') return;
-
-    const resolved = resolveResource(value, options.base, options.assetOrigin);
-    node.properties[key] = resolved.url;
-
-    if (node.tagName === 'a' && !resolved.local && !resolved.url.startsWith('#')) {
-      node.properties.target = '_blank';
-      node.properties.rel = ['noopener', 'noreferrer'];
-    }
-  });
-}
-
-function addHeadingAnchors(tree: HastRoot): HeadingEntry[] {
-  const nextSlug = createSlugger();
-  const headings: HeadingEntry[] = [];
-
-  visit(tree, 'element', (node: Element) => {
-    if (!/^h[1-6]$/.test(node.tagName)) return;
-
-    const text = toText(node).trim();
-    const id = nextSlug(text);
-    const depth = Number(node.tagName.slice(1));
-
-    node.properties = { ...node.properties, id };
-    node.children.unshift({
-      type: 'element',
-      tagName: 'a',
-      properties: {
-        className: ['anchor'],
-        href: `#${id}`,
-        ariaHidden: 'true',
-        tabIndex: -1,
-      },
-      children: [{ type: 'text', value: '#' }],
-    });
-
-    headings.push({ id, text, depth, line: 0 });
-  });
-
-  return headings;
 }
 
 function collectHeadingLines(tree: MdastRoot): number[] {
@@ -222,13 +174,101 @@ export function hastToPlainText(tree: HastRoot): string {
   return toText(tree).replace(/\s+/g, ' ').trim();
 }
 
+interface PostProcessResult {
+  headings: HeadingEntry[];
+  placeholders: PlaceholderSummary;
+  text: string;
+}
+
+/**
+ * Single-pass post-processing: resource URLs, placeholder counts and the plain
+ * text used for statistics are collected in one traversal; heading ids and
+ * anchors in a second, element-only traversal. Running four separate walks (as
+ * the naive version did) cost ~160 ms on a 200 KB document.
+ */
+function postProcess(tree: HastRoot, options: RenderOptions): PostProcessResult {
+  const textParts: string[] = [];
+  const placeholders = { mermaid: 0, math: 0 };
+
+  visit(tree, (node) => {
+    if (node.type === 'text') {
+      textParts.push(node.value);
+      return;
+    }
+
+    if (node.type !== 'element') return;
+    const element = node;
+
+    if (element.tagName === 'img' || element.tagName === 'a') {
+      const key = element.tagName === 'img' ? 'src' : 'href';
+      const value = element.properties?.[key];
+      if (typeof value === 'string') {
+        const resolved = resolveResource(value, options.base, options.assetOrigin);
+        element.properties[key] = resolved.url;
+        if (element.tagName === 'a' && !resolved.local && !resolved.url.startsWith('#')) {
+          element.properties.target = '_blank';
+          element.properties.rel = ['noopener', 'noreferrer'];
+        }
+      }
+    }
+
+    const classes = element.properties?.className;
+    if (Array.isArray(classes)) {
+      const names = classes.map(String);
+      if (names.includes(MERMAID_CLASS)) placeholders.mermaid += 1;
+      if (names.includes(MATH_INLINE_CLASS) || names.includes(MATH_DISPLAY_CLASS)) {
+        placeholders.math += 1;
+      }
+    }
+  });
+
+  const nextSlug = createSlugger();
+  const headings: HeadingEntry[] = [];
+
+  visit(tree, 'element', (node: Element) => {
+    if (node.tagName.length !== 2 || node.tagName[0] !== 'h') return;
+    const depth = Number(node.tagName.slice(1));
+    if (!Number.isInteger(depth) || depth < 1 || depth > 6) return;
+
+    const text = toText(node).trim();
+    const id = nextSlug(text);
+
+    node.properties = { ...node.properties, id };
+    node.children.unshift({
+      type: 'element',
+      tagName: 'a',
+      properties: {
+        className: ['anchor'],
+        href: `#${id}`,
+        ariaHidden: 'true',
+        tabIndex: -1,
+      },
+      children: [{ type: 'text', value: '#' }],
+    });
+
+    headings.push({ id, text, depth, line: 0 });
+  });
+
+  return {
+    headings,
+    placeholders,
+    text: textParts.join('').replace(/\s+/g, ' ').trim(),
+  };
+}
+
 export interface RenderOutput {
   hast: HastRoot;
   headings: HeadingEntry[];
   stats: DocumentStats;
   placeholders: PlaceholderSummary;
   /** Stage timings in milliseconds, used by the benchmark script. */
-  timings: { parse: number; transform: number; sanitize: number; total: number };
+  timings: {
+    parse: number;
+    transform: number;
+    sanitize: number;
+    post: number;
+    total: number;
+  };
 }
 
 function now(): number {
@@ -316,10 +356,14 @@ function offsetPositions(tree: MdastRoot, lineDelta: number, offsetDelta: number
   visit(tree, (node: Nodes) => {
     const position = node.position;
     if (!position) return;
-    position.start.line += lineDelta;
-    position.end.line += lineDelta;
-    if (typeof position.start.offset === 'number') position.start.offset += offsetDelta;
-    if (typeof position.end.offset === 'number') position.end.offset += offsetDelta;
+    position.start.line = Math.max(1, position.start.line + lineDelta);
+    position.end.line = Math.max(1, position.end.line + lineDelta);
+    if (typeof position.start.offset === 'number') {
+      position.start.offset = Math.max(0, position.start.offset + offsetDelta);
+    }
+    if (typeof position.end.offset === 'number') {
+      position.end.offset = Math.max(0, position.end.offset + offsetDelta);
+    }
   });
 }
 
@@ -341,16 +385,72 @@ export function parseMarkdown(source: string, chunked = true): MdastRoot {
     return PARSER.parse(source);
   }
 
+  // Link reference definitions and footnote definitions are global to a
+  // document, but micromark resolves them per parse. Every chunk therefore gets
+  // a copy of the definitions block, and positions are shifted back afterwards.
+  const definitions = collectDefinitionLines(source);
+  const prefix = definitions.length > 0 ? `${definitions.join('\n')}\n\n` : '';
+  const prefixLines = definitions.length > 0 ? definitions.length + 1 : 0;
+
   const root: MdastRoot = { type: 'root', children: [] };
   for (const chunk of splitMarkdown(source)) {
-    const tree = PARSER.parse(chunk.text);
-    if (chunk.startLine > 1 || chunk.startOffset > 0) {
-      offsetPositions(tree, chunk.startLine - 1, chunk.startOffset);
-    }
+    const tree = PARSER.parse(`${prefix}${chunk.text}`);
+    offsetPositions(tree, chunk.startLine - 1 - prefixLines, chunk.startOffset - prefix.length);
     root.children.push(...tree.children);
   }
 
   return root;
+}
+
+/** Collects reference and footnote definitions outside fenced code blocks,
+ * including indented continuation lines. */
+export function collectDefinitionLines(source: string): string[] {
+  const lines = source.split('\n');
+  const found: string[] = [];
+  const seen = new Set<string>();
+  let fence: string | null = null;
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? '';
+    const fenceMarker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1] ?? null;
+
+    if (fence) {
+      if (fenceMarker && fenceMarker[0] === fence[0] && fenceMarker.length >= fence.length) {
+        fence = null;
+      }
+      index += 1;
+      continue;
+    }
+
+    if (fenceMarker) {
+      fence = fenceMarker;
+      index += 1;
+      continue;
+    }
+
+    if (/^ {0,3}\[[^\]]+\]:/.test(line)) {
+      const block = [line];
+      let cursor = index + 1;
+      while (cursor < lines.length && /^[ \t]+\S/.test(lines[cursor] ?? '')) {
+        block.push(lines[cursor] ?? '');
+        cursor += 1;
+      }
+
+      const definition = block.join('\n');
+      if (!seen.has(definition)) {
+        seen.add(definition);
+        found.push(definition);
+      }
+
+      index = cursor;
+      continue;
+    }
+
+    index += 1;
+  }
+
+  return found;
 }
 
 export function renderMarkdown(source: string, options: RenderOptions): RenderOutput {
@@ -375,7 +475,7 @@ export function renderMarkdown(source: string, options: RenderOptions): RenderOu
   tree = unified().use(rehypeSanitize, SANITIZE_SCHEMA).runSync(tree);
   const sanitizeTime = now() - sanitizeStarted;
 
-  rewriteResources(tree, options);
+  const postStarted = now();
 
   // Large documents keep placeholders as plain text blocks instead of
   // expensive diagram/math components.
@@ -383,29 +483,27 @@ export function renderMarkdown(source: string, options: RenderOptions): RenderOu
     flattenPlaceholders(tree);
   }
 
-  const headings = addHeadingAnchors(tree);
-  for (const [index, heading] of headings.entries()) {
+  const post = postProcess(tree, options);
+  for (const [index, heading] of post.headings.entries()) {
     heading.line = headingLines[index] ?? 1;
   }
-  const plain = hastToPlainText(tree);
-  const words = countWords(plain);
+  const words = countWords(post.text);
+  const postTime = now() - postStarted;
 
   return {
     hast: tree,
-    headings,
+    headings: post.headings,
     stats: {
       words,
-      characters: plain.length,
+      characters: post.text.length,
       readingMinutes: words === 0 ? 0 : Math.max(1, Math.round(words / 200)),
     },
-    placeholders: {
-      mermaid: countByClass(tree, MERMAID_CLASS),
-      math: countByClass(tree, MATH_INLINE_CLASS) + countByClass(tree, MATH_DISPLAY_CLASS),
-    },
+    placeholders: post.placeholders,
     timings: {
       parse: round(parseTime),
       transform: round(transformTime),
       sanitize: round(sanitizeTime),
+      post: round(postTime),
       total: round(now() - startedAt),
     },
   };
@@ -424,15 +522,6 @@ function mathElement(node: unknown, display: boolean): Element {
     },
     children: [{ type: 'text', value: toString(node) }],
   };
-}
-
-function countByClass(tree: HastRoot, className: string): number {
-  let count = 0;
-  visit(tree, 'element', (node: Element) => {
-    const classes = node.properties?.className;
-    if (Array.isArray(classes) && classes.map(String).includes(className)) count += 1;
-  });
-  return count;
 }
 
 function flattenPlaceholders(tree: HastRoot): void {

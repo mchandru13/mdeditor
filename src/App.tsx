@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { DocumentTabs } from './components/DocumentTabs/DocumentTabs';
 import { UrlDialog } from './components/Dialogs/UrlDialog';
 import { SplitDivider } from './components/Divider/SplitDivider';
-import { Editor, type EditorHandle } from './components/Editor/Editor';
+import { Editor, type EditorHandle } from './components/Editor/EditorLazy';
 import { SearchBar } from './components/SearchBar/SearchBar';
 import { Toc } from './components/Toc/Toc';
 import { StatusBar } from './components/Toolbar/StatusBar';

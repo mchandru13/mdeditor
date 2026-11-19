@@ -4,6 +4,7 @@ import { toHtml } from 'hast-util-to-html';
 import {
   CHUNK_SIZE,
   CHUNK_THRESHOLD,
+  collectDefinitionLines,
   parseMarkdown,
   renderMarkdown,
   splitMarkdown,
@@ -98,5 +99,60 @@ describe('chunked parsing', () => {
     const withChunking = toHtml(renderMarkdown(source, OPTIONS).hast);
 
     expect(withChunking).toBe(withoutChunking);
+  });
+
+  it('does not split lists or blockquotes across chunk boundaries', () => {
+    const source = Array.from(
+      { length: 1800 },
+      (_, index) => `- item ${index} of a list\n\n- second ${index}\n\n> quote ${index}\n\n`,
+    ).join('');
+    expect(source.length).toBeGreaterThan(CHUNK_THRESHOLD);
+
+    const chunked = renderMarkdown(source, OPTIONS);
+    const plain = renderMarkdown(source, { ...OPTIONS, chunking: false });
+
+    expect(toHtml(chunked.hast)).toBe(toHtml(plain.hast));
+    expect(chunked.headings.length).toBe(plain.headings.length);
+  });
+
+  it('resolves reference links whose definition is in a later chunk', () => {
+    const filler = Array.from({ length: 1200 }, (_, index) => paragraph(index)).join('');
+    const source = `${filler}[link][ref] and [^note]\n\n[ref]: https://example.com/target\n\n[^note]: footnote body\n`;
+    expect(source.length).toBeGreaterThan(CHUNK_THRESHOLD);
+
+    const html = toHtml(renderMarkdown(source, OPTIONS).hast);
+    const reference = toHtml(renderMarkdown(source, { ...OPTIONS, chunking: false }).hast);
+
+    expect(html).toContain('href="https://example.com/target"');
+    expect(html).toContain('footnote-ref');
+    expect(html).toBe(reference);
+  });
+
+  it('collects definitions outside fenced code blocks only', () => {
+    const source = '```\n[not]: a-definition\n```\n\n[real]: https://example.com\n';
+    expect(collectDefinitionLines(source)).toEqual(['[real]: https://example.com']);
+  });
+
+  it('collects indented continuation lines of a definition', () => {
+    const source = '[ref]:\n  https://example.com/target\n\nbody\n';
+    expect(collectDefinitionLines(source)).toEqual([
+      '[ref]:\n  https://example.com/target',
+    ]);
+  });
+
+  it('resolves a multi-line definition that sits after a chunk boundary', () => {
+    const filler = Array.from({ length: 1200 }, (_, index) => paragraph(index)).join('');
+    const source = `${filler}[link][ref]\n\n[ref]:\n  https://example.com/multi\n`;
+    expect(source.length).toBeGreaterThan(CHUNK_THRESHOLD);
+
+    expect(toHtml(renderMarkdown(source, OPTIONS).hast)).toContain(
+      'href="https://example.com/multi"',
+    );
+  });
+
+  it('ignores definitions when the document is small enough to parse whole', () => {
+    const source = '[a][ref]\n\n[ref]: https://example.com\n';
+    const html = toHtml(renderMarkdown(source, OPTIONS).hast);
+    expect(html).toContain('href="https://example.com"');
   });
 });

@@ -27,7 +27,7 @@ export interface EditorHandle {
   scrollToLine(line: number): void;
 }
 
-interface EditorProps {
+export interface EditorProps {
   docId: DocId;
   value: string;
   onChange: (value: string) => void;

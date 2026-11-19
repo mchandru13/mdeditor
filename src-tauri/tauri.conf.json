@@ -36,6 +36,11 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
+    "publisher": "Chandrasekaran Mohandoss",
+    "copyright": "Copyright © 2026 Chandrasekaran Mohandoss",
+    "category": "Productivity",
+    "shortDescription": "Local-first Markdown viewer and editor",
+    "longDescription": "A lightweight Markdown viewer and editor with tabbed documents, Read/Edit/Split modes, GitHub-flavoured Markdown, KaTeX math and Mermaid diagrams.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

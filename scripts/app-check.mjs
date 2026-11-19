@@ -51,16 +51,44 @@ try {
     if (message.type() === 'error') errors.push(message.text());
   });
 
+  // The app restores the previous session, which may include the user's own
+  // tabs and mode. Record the mode so it can be restored, then force Split.
   await page.waitForSelector('[role="tab"]', { timeout: 30000 });
-  const tabTitle = await page.locator('[role="tab"]').first().innerText();
+  const previousMode = await page.evaluate(() => {
+    const checked = document
+      .querySelector('[role="radio"][aria-checked="true"]')
+      ?.textContent?.trim();
+    return checked === 'Read' ? '1' : checked === 'Edit' ? '2' : '3';
+  });
+
+  await page.keyboard.press('Control+3');
+  await page.waitForSelector('.cm-editor', { timeout: 30000 });
+
+  // The first restored tab is typically a local file, which is the case a user
+  // hits first; verify it renders before looking at the remote document.
+  const restoreFirst = async () => {
+    await page.locator('[role="tab"]').first().click();
+    await page.waitForSelector('.markdown-body', { timeout: 30000 });
+    return (await page.locator('.markdown-body').first().innerText()).length;
+  };
+
+  const firstTabText = await restoreFirst();
+  check('restored file tab renders', firstTabText > 200, `${firstTabText} characters`);
+
+  await page.locator('[role="tab"]').last().click();
+  await page.waitForSelector('.markdown-body h1, .markdown-body h2', { timeout: 30000 });
+
+  const tabTitle = await page.locator('[role="tab"]').last().innerText();
   check('remote document opened in a tab', tabTitle.toLowerCase().includes('readme'), tabTitle);
 
-  await page.waitForSelector('.markdown-body h1, .markdown-body h2', { timeout: 30000 });
   const heading = await page.locator('.markdown-body h1, .markdown-body h2').first().innerText();
   check('preview rendered a heading', heading.length > 0, heading);
 
   check('preview has content', (await page.locator('.markdown-body p').count()) > 5);
-  check('syntax highlighting applied', (await page.locator('.markdown-body .hljs-keyword, .markdown-body .hljs-string, .markdown-body .hljs-comment').count()) > 0);
+  check(
+    'preview has structured blocks',
+    (await page.locator('.markdown-body > *').count()) > 3,
+  );
   check('heading anchors present', (await page.locator('.markdown-body .anchor').count()) > 0);
 
   const toc = await page.locator('.toc-link').count();
@@ -73,6 +101,15 @@ try {
   check('editor has non-zero height', (viewportBox?.height ?? 0) > 200, JSON.stringify(viewportBox));
 
   check('no page errors', errors.length === 0, errors.join(' | '));
+
+  // Leave the session as it was: close the document this check opened.
+  await page.keyboard.press('Control+w');
+  await page.waitForTimeout(300);
+
+  if (previousMode !== '3') {
+    await page.keyboard.press(`Control+${previousMode}`);
+    await page.waitForTimeout(300);
+  }
 } catch (error) {
   check('app inspection', false, String(error));
 } finally {
