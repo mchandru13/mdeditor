@@ -30,6 +30,7 @@ export interface Platform {
   /** Generic confirmation used for non-destructive limits such as tab count. */
   confirmAction(message: string): Promise<boolean>;
   startupUrl(): Promise<string | null>;
+  startupFile(): Promise<string | null>;
   closeWindow(): Promise<void>;
   print(): void;
 }

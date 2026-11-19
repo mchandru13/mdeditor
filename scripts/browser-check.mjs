@@ -100,6 +100,7 @@ check('preview updates after typing', true);
 // ---- mode switching ---------------------------------------------------------
 await page.keyboard.press('Control+1');
 await page.waitForSelector('.markdown-body h1', { timeout: 8000 });
+await page.waitForSelector('.cm-editor', { state: 'detached', timeout: 8000 });
 check('read mode hides the editor', (await page.locator('.cm-editor').count()) === 0);
 check('read mode keeps the document', (await page.locator('.markdown-body h1').count()) > 0);
 

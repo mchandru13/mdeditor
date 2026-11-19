@@ -7,18 +7,19 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Emitter, Manager, State};
 
-/// Result of parsing `--url` at startup.
+/// Result of parsing `--url` and `--file` at startup.
 struct StartupArgs {
     url: Option<String>,
+    file: Option<String>,
 }
 
-fn parse_url_arg() -> Option<String> {
+fn parse_arg(flag: &str) -> Option<String> {
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
-        if arg == "--url" {
+        if arg == flag {
             return args.next();
         }
-        if let Some(value) = arg.strip_prefix("--url=") {
+        if let Some(value) = arg.strip_prefix(&format!("{flag}=")) {
             return Some(value.to_string());
         }
     }
@@ -28,6 +29,11 @@ fn parse_url_arg() -> Option<String> {
 #[tauri::command]
 fn startup_url(state: State<'_, StartupArgs>) -> Option<String> {
     state.url.clone()
+}
+
+#[tauri::command]
+fn startup_file(state: State<'_, StartupArgs>) -> Option<String> {
+    state.file.clone()
 }
 
 #[tauri::command]
@@ -102,7 +108,8 @@ fn close_window(window: tauri::Window) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let startup = StartupArgs {
-        url: parse_url_arg(),
+        url: parse_arg("--url"),
+        file: parse_arg("--file"),
     };
 
     tauri::Builder::default()
@@ -112,6 +119,7 @@ pub fn run() {
         .manage(startup)
         .invoke_handler(tauri::generate_handler![
             startup_url,
+            startup_file,
             read_document,
             write_document,
             modified_time,

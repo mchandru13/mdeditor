@@ -140,6 +140,10 @@ export function createTauriPlatform(): Platform {
       return invoke<string | null>('startup_url');
     },
 
+    async startupFile() {
+      return invoke<string | null>('startup_file');
+    },
+
     async closeWindow() {
       await invoke('close_window');
     },

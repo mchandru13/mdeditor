@@ -101,6 +101,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const lastDirRef = useRef<string | null>(null);
   const hydratingRef = useRef(new Set<DocId>());
   const syncLockRef = useRef(0);
+  const startupHandledRef = useRef(false);
   const scrollSaveRef = useRef(0);
   const mermaidSeq = useRef(0);
 
@@ -386,11 +387,17 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
 
   useEffect(() => {
+    if (startupHandledRef.current) return;
+    startupHandledRef.current = true;
+
     void (async () => {
+      const file = await platform.startupFile();
+      if (file) await openPath(file);
+
       const url = await platform.startupUrl();
       if (url) await openRemote(url);
     })();
-  }, [platform, openRemote]);
+  }, [platform, openPath, openRemote]);
 
   const openFromDialog = useCallback(async () => {
     const path = await platform.openFileDialog();

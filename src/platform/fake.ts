@@ -12,6 +12,7 @@ export interface FakePlatformOptions {
   settings?: string | null;
   clipboard?: string;
   startupUrl?: string | null;
+  startupFile?: string | null;
   readFileError?: Record<string, string>;
   writeFileError?: string;
   settingsError?: string;
@@ -161,6 +162,10 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
 
     async startupUrl() {
       return options.startupUrl ?? null;
+    },
+
+    async startupFile() {
+      return options.startupFile ?? null;
     },
 
     async closeWindow() {

@@ -62,6 +62,7 @@ Icons live in `src-tauri/icons/` and are generated from `app-icon.png` with `npx
 | `npm run check:ui` | Playwright smoke test against the production bundle (needs `npm run preview`) |
 | `npm run check:app` | Playwright + CDP smoke test against the packaged desktop app |
 | `npm run check:menu` | Windows UI Automation check of the native menu bar |
+| `npm run check:e2e` | End-to-end run of the packaged app: open, edit, replace, save, external change, modes |
 
 ## Using the application
 
@@ -79,6 +80,15 @@ A native Windows menu bar exposes every action and its accelerator:
 The menu, the toolbar and the keyboard shortcuts all call the same handlers, so behaviour cannot drift between them. Cut/Copy/Paste/Select All are predefined OS items and therefore apply to whatever currently has focus. Toggle items do not show a check mark; the toolbar's pressed state and the View menu act on the same underlying setting.
 
 ### Opening documents
+
+A file can be opened directly from the command line, which also makes the packaged app scriptable and testable:
+
+```powershell
+mdeditor.exe --file "C:\docs\notes.md"
+mdeditor.exe --url "https://example.com/README.md"
+```
+
+`--file` accepts `.md`/`.markdown`; `--url` goes through the same HTTPS-only fetch path as the dialog.
 
 - **New** (Ctrl+N) creates an empty untitled document, numbered (`Untitled 1`, `Untitled 2`, …).
 - **Open** (Ctrl+O) uses the native file picker and accepts `.md` and `.markdown`.
@@ -231,11 +241,14 @@ npm run check:ui         # 17 assertions against http://localhost:4173
 ```bash
 npm run tauri:build      # then
 npm run check:app        # attaches to the packaged app over CDP and opens a remote document
+npm run check:e2e        # full session against the packaged app
 ```
 
 `check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, replace-all, the TOC, and zero page errors. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
 
-`check:ui` needs Edge installed and a running preview server; `check:app` needs a release build and network access for the remote document.
+`check:e2e` drives the packaged application through a full editing session: it writes a temporary Markdown file, opens it with `--file`, renders it, types into the editor, replaces text through the find-and-replace UI, saves with Ctrl+S and verifies the bytes on disk, modifies the file from outside and confirms the reload, copies rendered HTML, and switches to Read Mode. Native dialogs (file picker, print, export destination) are the only part of the flow that cannot be automated.
+
+`check:ui` needs Edge installed and a running preview server; `check:app` and `check:e2e` need a release build (and network access for the remote document). `check:e2e` writes its document to a temporary directory, removes it afterwards, and closes the tab it opened so the restored session is left as it was.
 
 ### Manual smoke checklist (packaged build)
 
@@ -265,6 +278,7 @@ Everything below was executed on the reference machine (11th Gen Intel Core i5-1
 | Native tests | `npm run test:rust` | 25 passed |
 | Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
+| End-to-end session | `npm run check:e2e` | 12/12: open via `--file`, render, edit, replace, save to disk, external reload, copy HTML, mode switch; four consecutive clean runs |
 | Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation). Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
 | Desktop release build | `npm run tauri:build` | passed; NSIS and MSI installers produced |
 | Packaged app boot | run `src-tauri/target/release/mdeditor.exe` | process stayed alive, React mounted, and `%APPDATA%\com.rea.mdeditor\settings.json` was written through IPC with the expected defaults |

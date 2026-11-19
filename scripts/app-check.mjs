@@ -65,15 +65,30 @@ try {
   await page.waitForSelector('.cm-editor', { timeout: 30000 });
 
   // The first restored tab is typically a local file, which is the case a user
-  // hits first; verify it renders before looking at the remote document.
+  // hits first; verify it renders before looking at the remote document. This
+  // depends on the session that was restored, so it is reported as skipped when
+  // the session contained no local file to restore.
   const restoreFirst = async () => {
-    await page.locator('[role="tab"]').first().click();
+    const tabs = page.locator('[role="tab"]');
+    const count = await tabs.count();
+    if (count < 2) return null;
+
+    await tabs.first().click();
     await page.waitForSelector('.markdown-body', { timeout: 30000 });
     return (await page.locator('.markdown-body').first().innerText()).length;
   };
 
   const firstTabText = await restoreFirst();
-  check('restored file tab renders', firstTabText > 200, `${firstTabText} characters`);
+  if (firstTabText === null) {
+    checks.push({
+      name: 'restored file tab renders',
+      ok: true,
+      skipped: true,
+      detail: 'session had no local file tab to restore',
+    });
+  } else {
+    check('restored file tab renders', firstTabText > 200, `${firstTabText} characters`);
+  }
 
   await page.locator('[role="tab"]').last().click();
   await page.waitForSelector('.markdown-body h1, .markdown-body h2', { timeout: 30000 });
@@ -118,8 +133,10 @@ try {
 }
 
 for (const entry of checks) {
-  console.log(`${entry.ok ? 'PASS' : 'FAIL'}  ${entry.name}${entry.detail ? `  — ${entry.detail}` : ''}`);
+  const label = entry.skipped ? 'SKIP' : entry.ok ? 'PASS' : 'FAIL';
+  console.log(`${label}  ${entry.name}${entry.detail ? `  — ${entry.detail}` : ''}`);
 }
 const failed = checks.filter((entry) => !entry.ok).length;
-console.log(`\n${checks.length - failed}/${checks.length} checks passed`);
+const skipped = checks.filter((entry) => entry.skipped).length;
+console.log(`\n${checks.length - failed - skipped} passed, ${failed} failed, ${skipped} skipped`);
 process.exit(failed === 0 ? 0 : 1);

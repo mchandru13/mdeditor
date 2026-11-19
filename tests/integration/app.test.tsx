@@ -663,6 +663,23 @@ describe('external file changes', () => {
   });
 });
 
+describe('command line arguments', () => {
+  it('opens the file passed with --file', async () => {
+    renderApp({ startupFile: 'C:\\docs\\cli.md', files: { 'C:\\docs\\cli.md': '# From CLI\n' } });
+
+    expect(await screen.findByRole('tab', { name: /cli.md/ })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Markdown source editor')).toHaveValue('# From CLI\n');
+  });
+
+  it('ignores a --file path that is not Markdown', async () => {
+    renderApp({ startupFile: 'C:\\docs\\notes.txt', files: { 'C:\\docs\\notes.txt': 'x' } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Only \.md and \.markdown files are supported/)).toBeInTheDocument();
+    });
+  });
+});
+
 describe('preferences', () => {
   it('persists the workspace mode and theme', async () => {
     const { platform } = renderApp({}, 'split');
