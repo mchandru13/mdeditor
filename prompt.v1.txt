@@ -1,0 +1,620 @@
+# Build a Production-Ready Markdown Viewer and Editor
+
+You are a senior desktop application engineer specializing in Rust, Tauri, React, TypeScript, Markdown processing, application security, performance optimization, and accessibility.
+
+Build a complete, working Markdown desktop application. **Deliver working code, not a plan, prototype, mockup, or partial implementation.**
+
+Use the installed Reverse Engineering Anything (REA) skill in OpenCode according to its documented workflow before modifying the project.
+
+## 1. Objective
+
+Build a lightweight, fast, local-first Markdown viewer and editor with a polished interface inspired by Notepad++.
+
+The application must support multiple documents in tabs, three workspace modes (Read, Edit and Split), Markdown rendering, source editing, navigation, search, export, printing, theming, and persistent settings.
+
+Target platform: Windows 10/11.
+
+Keep the architecture portable to macOS and Linux where practical.
+
+## 2. Mandatory initial workflow: use REA
+
+Before writing code:
+
+1. Read the installed REA skill instructions and determine its documented read, edit and split workflows.
+2. Inspect the existing repository, directory structure, dependencies, configuration, current implementation and available tests.
+3. Identify existing functionality, missing requirements, architectural risks and reusable components.
+4. State assumptions and findings in one short list, then proceed directly to implementation.
+5. Preserve existing working functionality and follow established project conventions unless there is a clear reason to change them.
+
+Use REA as a development aid, not as a runtime dependency of the application.
+
+Do not assume that REA's own operating modes are equivalent to the Markdown application's Read, Edit and Split modes. They are separate concepts.
+
+Do not stop to ask questions. Choose the simplest safe implementation when a detail is ambiguous and document the decision.
+
+## 3. Fixed technology stack
+
+Use these technologies unless an actual technical blocker requires a documented alternative.
+
+- Desktop framework: Tauri 2.
+- Native backend: Rust.
+- Frontend: React and TypeScript.
+- Development and bundling: Vite.
+- Styling: CSS modules or organized plain CSS with shared design tokens.
+- Package manager: npm.
+- Markdown processing: Unified, Remark and Rehype ecosystem.
+- GFM: `remark-gfm` and appropriate maintained plugins.
+- HTML sanitization: `rehype-sanitize` with an explicit, narrowly scoped schema.
+- Math: KaTeX.
+- Diagrams: Mermaid.
+- Code highlighting: a maintained syntax-highlighting library compatible with the rendering pipeline.
+- Testing: Vitest, React Testing Library, and Rust tests where appropriate.
+
+Select mutually compatible dependency versions and commit the package lockfile.
+
+Use Rust for native integration, controlled filesystem operations and desktop capabilities. Use React/TypeScript for the UI and Markdown processing.
+
+Do not substitute a browser-only app for the requested desktop application.
+
+## 4. Application interface
+
+Build a compact, polished interface inspired by Notepad++.
+
+The application must contain:
+
+- A main toolbar.
+- A multi-document tab bar.
+- A prominent three-option workspace mode selector.
+- A central workspace.
+- A collapsible table-of-contents sidebar.
+- A search interface.
+- A status bar with relevant document statistics.
+- Consistent empty, loading, error and unsaved-change states.
+
+Support light, dark and system themes.
+
+Use a restrained, professional design with good typography, clear spacing, consistent controls, keyboard focus indicators and no unnecessary animations.
+
+The interface must remain usable at typical desktop window sizes and when panes are resized.
+
+## 5. Workspace modes: Read, Edit and Split
+
+Provide exactly three primary workspace modes, selectable from the toolbar:
+
+1. Read Mode
+2. Edit Mode
+3. Split Mode
+
+Use a segmented control or similarly clear selector. Indicate the active mode accessibly and persist the selection.
+
+### 5.1 Read Mode
+
+Purpose: provide a distraction-free Markdown reading experience.
+
+- Display rendered Markdown without the source editor.
+- Support the complete specified Markdown rendering pipeline.
+- Provide TOC navigation, scroll-spy, heading anchors and reading statistics.
+- Support in-document search with highlighted matches and next/previous navigation.
+- Allow copying code blocks and opening links safely.
+- Hide editing controls that are irrelevant to reading.
+- Do not modify the source document through preview interactions.
+
+### 5.2 Edit Mode
+
+Purpose: provide an efficient Markdown source editor.
+
+- Display the source editor without the rendered preview.
+- Provide line numbers, Markdown syntax highlighting and standard editing shortcuts.
+- Support undo, redo, select all, clipboard operations and search.
+- Support Save and Save As for local files.
+- Indicate unsaved changes clearly.
+- Preserve the original source content exactly when opening and saving without intentional edits.
+- Do not perform unnecessary full Markdown rendering while the preview is hidden.
+
+Use CodeMirror or another lightweight established editor if justified by the feature requirements. Avoid building an entire editor framework from scratch.
+
+### 5.3 Split Mode
+
+Purpose: enable simultaneous source editing and live preview.
+
+- Show the Markdown source editor on the left and rendered preview on the right.
+- Provide a draggable divider for resizing panes.
+- Debounce preview updates by approximately 150 ms after typing stops.
+- Preserve the latest source content.
+- Support synchronized scrolling with a toolbar toggle.
+- Prevent scroll feedback loops and unnecessary rerenders.
+- Keep the preview, search and navigation consistent with the active document.
+- Defer expensive Mermaid or math rendering when necessary to maintain responsiveness.
+
+### 5.4 Mode switching and document state
+
+Mode changes must change the presentation, not create a new document, discard edits or reload stale content from disk.
+
+Implement these transitions:
+
+- Read → Edit: display the current source.
+- Edit → Read: render the latest source.
+- Edit → Split: display the current source and update the preview.
+- Split → Read: show the latest rendered content.
+- Split → Edit: preserve the current source and editor state.
+
+Requirements:
+
+- Preserve unsaved edits across all mode transitions.
+- Maintain independent source content, modified state and view state for each document tab.
+- Do not overwrite disk content without an explicit save operation.
+- Indicate modified documents in their tabs.
+- Prompt before destructive operations that would discard unsaved edits.
+- Persist the selected mode between sessions.
+- Preserve scroll positions where practical.
+- Ensure rendering errors never erase or corrupt source content.
+
+### 5.5 Suggested keyboard shortcuts
+
+Implement and document platform-appropriate shortcuts.
+
+| Shortcut on Windows/Linux | Action |
+|---|---|
+| `Ctrl+1` | Read Mode |
+| `Ctrl+2` | Edit Mode |
+| `Ctrl+3` | Split Mode |
+| `Ctrl+F` | Search |
+| `Ctrl+S` | Save |
+| `Ctrl+Shift+S` | Save As |
+| `Ctrl+O` | Open file |
+| `Ctrl+W` | Close current tab |
+| `Escape` | Close or dismiss the active search/dialog when appropriate |
+
+Use suitable macOS equivalents. Avoid intercepting shortcuts when doing so would interfere with normal text editing or accessibility.
+
+Add tests for mode switching, dirty-state preservation, preview freshness, tab independence and keyboard shortcuts.
+
+## 6. Document input and file operations
+
+Support:
+
+- Native file picker for `.md` and `.markdown` files.
+- Drag-and-drop Markdown files into the application.
+- Clipboard paste into a new document.
+- Multiple simultaneously open documents.
+- Remote Markdown fetching through an explicit `?url=` parameter.
+- Save and Save As for local files.
+
+### Tab management
+
+Implement:
+
+- Open document in a new tab.
+- Switch between tabs.
+- Close individual tabs.
+- Track the active tab.
+- Prevent accidental loss of unsaved edits.
+- Handle opening the same file multiple times sensibly.
+- Restore supported session state after restarting the application.
+
+Use native file dialogs and Tauri's supported filesystem capabilities. Apply least-privilege permissions.
+
+### Remote documents
+
+Remote fetching is opt-in and must be limited to the explicit URL-loading feature.
+
+- Accept HTTP and HTTPS URLs only.
+- Validate URLs and reject unsupported schemes.
+- Display loading, network, HTTP and parsing errors clearly.
+- Do not silently fetch remote documents or assets for local files.
+- Handle redirects and failed requests safely.
+- Apply appropriate timeouts and response-size limits.
+
+Do not include analytics, telemetry or hidden external requests.
+
+## 7. Markdown rendering pipeline
+
+Support full GitHub Flavored Markdown, including:
+
+- Headings and paragraphs.
+- Ordered, unordered and nested lists.
+- Task lists.
+- Tables.
+- Blockquotes.
+- Inline code and fenced code blocks.
+- Strikethrough.
+- Autolinks.
+- Footnotes.
+- Horizontal rules.
+- Links and images.
+
+Additional requirements:
+
+- Syntax-highlighted code blocks.
+- Copy-to-clipboard buttons for code blocks.
+- Inline and block mathematical expressions with KaTeX.
+- Mermaid diagrams in fenced `mermaid` blocks.
+- Heading anchors and stable slugs.
+- Relative image and link resolution.
+- Useful errors for malformed or unsupported content.
+
+Build the Markdown pipeline as a reusable, testable module. Separate parsing, transformation, sanitization and rendering concerns.
+
+Use lazy loading for Mermaid and KaTeX.
+
+### Relative resources
+
+Resolve resources according to document origin:
+
+- Local Markdown file: resolve relative resources against the file's parent directory.
+- Remote Markdown: resolve relative URLs against the remote document URL.
+- Pasted Markdown: use a defined base directory when available. Otherwise preserve unresolved relative paths and communicate the limitation.
+
+Use controlled Tauri asset access for local images. Do not expose unrestricted filesystem APIs to the frontend.
+
+Open external links safely in the system browser or an appropriate isolated external context.
+
+## 8. Navigation and document statistics
+
+Implement a generated table of contents.
+
+Requirements:
+
+- Nested heading hierarchy.
+- Sticky or collapsible sidebar.
+- Clickable heading entries.
+- Scroll-spy that identifies the current section.
+- Stable heading IDs.
+- Unique slugs for duplicate headings.
+- Visible heading anchor links.
+- Reading-time estimate.
+- Word and character counts where practical.
+- Back-to-top control.
+
+Update navigation when the document changes and ensure each tab uses its own TOC state.
+
+## 9. In-document search
+
+Implement application-owned search. Do not rely on the browser's native Find dialog.
+
+Features:
+
+- `Ctrl+F` on Windows/Linux and `Cmd+F` on macOS.
+- Search the active document.
+- Highlight matches.
+- Show current match and total count.
+- Next and previous navigation.
+- Case-sensitive matching toggle.
+- Escape to dismiss search.
+- Keyboard-only operation.
+
+In Read Mode, search rendered content and navigate to visible matches.
+
+In Edit Mode, search the Markdown source.
+
+In Split Mode, search the current source and keep the preview representation synchronized where practical.
+
+Do not use unsafe HTML injection to highlight results. Avoid corrupting links, code, diagrams or the document's security guarantees.
+
+## 10. Theming, accessibility and printing
+
+### Theming
+
+Support light, dark and system themes.
+
+- Persist the selected theme.
+- Respect operating-system theme changes in System mode.
+- Use shared design tokens.
+- Maintain WCAG AA contrast where applicable.
+- Support visible keyboard focus and reduced-motion preferences.
+
+### Accessibility
+
+Target WCAG 2.2 AA where applicable.
+
+- Use semantic HTML.
+- Provide accessible names for icon-only controls.
+- Make every important control keyboard-operable.
+- Maintain logical focus order.
+- Prevent keyboard traps.
+- Use appropriate ARIA attributes.
+- Announce search results and relevant state changes.
+- Ensure tabs and dialogs handle focus correctly.
+- Make all three workspace modes accessible.
+
+### Printing
+
+Provide a clean print stylesheet.
+
+- Remove application chrome.
+- Hide editing controls and unnecessary navigation.
+- Preserve readable typography, code formatting and tables.
+- Handle page breaks sensibly.
+- Support printing the current rendered document to PDF through the system print dialog.
+
+Do not claim that a PDF has been saved unless the user completes the print workflow.
+
+## 11. Export
+
+Implement three distinct operations.
+
+### Copy rendered HTML
+
+Copy sanitized rendered HTML to the clipboard.
+
+Clearly distinguish a rendered HTML fragment from a complete standalone HTML document.
+
+### Export standalone HTML
+
+Generate a `.html` file that can be opened locally in a browser without requiring the application or development server.
+
+- Include necessary CSS for layout and syntax highlighting.
+- Preserve mathematical expressions and rendered Mermaid diagrams.
+- Embed generated SVG and other generated content when practical.
+- Embed local images as data URLs when feasible.
+- Preserve remote image URLs only when explicitly supported.
+- Ensure untrusted content cannot execute arbitrary scripts.
+- Do not include application secrets or unnecessary local filesystem paths.
+- Handle large exports gracefully.
+
+Do not silently claim full self-containment when external dependencies remain.
+
+### Print to PDF
+
+Open the system print dialog with the print-optimized document.
+
+## 12. Persistence
+
+Persist application preferences and session information locally.
+
+Where supported, remember:
+
+- Theme.
+- Workspace mode.
+- TOC visibility.
+- Panel dimensions.
+- Open document paths and tab order.
+- Last active tab.
+- Scroll positions.
+- Bounded recovery data for unsaved or pasted documents.
+
+For disk-backed files, prefer storing paths and lightweight session metadata rather than duplicating entire files.
+
+Implement versioned settings and guard against:
+
+- Storage quota errors.
+- Corrupted serialized data.
+- Missing files.
+- Permission failures.
+- Unavailable storage.
+- Invalid settings versions.
+
+Never silently discard unsaved content because persistence failed. Clearly distinguish saved file content from recovery data.
+
+## 13. Security requirements
+
+Treat all Markdown as untrusted, including local files.
+
+Mandatory requirements:
+
+1. Disable raw HTML by default, or process it through `rehype-raw` followed by `rehype-sanitize` with an explicit allowlist.
+2. Configure the sanitizer for required Markdown elements, task lists, KaTeX and generated content without granting arbitrary HTML capabilities.
+3. Reject dangerous URL schemes, including `javascript:`.
+4. Remove event-handler attributes such as `onerror` and `onload`.
+5. Prevent arbitrary script execution through HTML, SVG, Mermaid, embedded content and exported documents.
+6. Configure Mermaid with a restrictive security mode.
+7. Add `rel="noopener noreferrer"` to applicable external links.
+8. Apply an appropriate Content Security Policy and restrictive Tauri capabilities.
+9. Do not expose unrestricted filesystem or shell APIs to the frontend.
+10. Make remote fetching explicit and constrained.
+11. Do not include analytics, telemetry or hidden network requests.
+
+Security must be enforced at the rendering and export boundaries, not merely through input validation.
+
+Include adversarial tests for malicious HTML, unsafe URLs, SVG, event handlers and exported HTML.
+
+## 14. Performance requirements
+
+Target a 5 MB Markdown source file without unacceptable UI freezes.
+
+Implement:
+
+- Approximately 150 ms debounce for editor-driven rendering in Split Mode.
+- Efficient state management and memoization.
+- Lazy loading of KaTeX and Mermaid.
+- Deferred diagram rendering where practical.
+- Efficient heading indexing and search.
+- Avoidance of unnecessary DOM updates.
+- Responsive editing during expensive rendering.
+- Graceful handling of large tables, code blocks and diagrams.
+
+Benchmark representative 200 KB and 5 MB documents.
+
+For a 200 KB document, target under 300 ms from completed file drop to usable rendered preview on an agreed reference machine. Define the measurement boundaries and report the actual result.
+
+Aim for Lighthouse performance of at least 90 on an appropriate production frontend build. Document the test environment and report actual measurements rather than assuming compliance.
+
+Use progressive rendering or deferred processing where needed to preserve responsiveness.
+
+## 15. Project structure
+
+Adapt the following structure to the existing repository where appropriate.
+
+```text
+src/
+  components/
+    Viewer/
+    Editor/
+    Toc/
+    SearchBar/
+    Toolbar/
+    CodeBlock/
+    Mermaid/
+    DocumentTabs/
+    WorkspaceModeSelector/
+  hooks/
+    useScrollSpy.ts
+    useLocalStorage.ts
+    useDebounce.ts
+    useTheme.ts
+  lib/
+    markdownPipeline.ts
+    exportHtml.ts
+    slug.ts
+    search.ts
+    assetResolver.ts
+  styles/
+    tokens.css
+    viewer.css
+    editor.css
+    print.css
+  App.tsx
+  main.tsx
+
+src-tauri/
+  src/
+    lib.rs
+    main.rs
+  capabilities/
+  tauri.conf.json
+  Cargo.toml
+
+tests/
+  unit/
+  integration/
+
+package.json
+package-lock.json
+tsconfig.json
+vite.config.ts
+README.md
+```
+
+Use TypeScript types, focused components and maintainable abstractions. Do not create unnecessary layers.
+
+## 16. Required npm scripts
+
+Provide real, working scripts:
+
+- `npm run dev`
+- `npm run build`
+- `npm run preview`
+- `npm test`
+- `npm run lint`
+- `npm run typecheck`
+
+Also provide documented Tauri development and packaging commands.
+
+Do not use placeholder scripts that simply print success or bypass checks.
+
+## 17. Automated tests
+
+### Markdown and security
+
+Test:
+
+- GFM tables.
+- Task lists.
+- Strikethrough and footnotes.
+- Heading generation.
+- Duplicate slug uniqueness.
+- Raw HTML sanitization.
+- `javascript:` URL rejection.
+- Event-handler removal.
+- SVG and Mermaid security behavior.
+- Sanitized HTML export.
+
+### Search and navigation
+
+Test:
+
+- Match counting.
+- Next/previous navigation.
+- Case sensitivity.
+- Safe highlighting.
+- TOC hierarchy.
+- Heading navigation.
+- Duplicate headings.
+
+### Workspace modes and tabs
+
+Test:
+
+- Correct UI in Read, Edit and Split modes.
+- Every mode transition.
+- Preservation of unsaved source content.
+- Preview freshness after editing.
+- Independent state for multiple tabs.
+- Modified-document warnings.
+- Mode persistence.
+- Keyboard shortcuts.
+- Focus handling.
+- Search behavior in each mode.
+
+### Persistence and file handling
+
+Test:
+
+- Theme persistence.
+- Storage quota failures.
+- Corrupted settings.
+- Missing local files.
+- Relative asset resolution.
+- File opening and saving.
+- Export behavior.
+
+Add integration or end-to-end tests for opening a file, editing, switching modes, searching, switching tabs and rendering hostile Markdown.
+
+## 18. Deliverables
+
+Provide:
+
+1. Complete working source code.
+2. Dependency manifests and lockfiles.
+3. Tauri configuration and Rust code.
+4. All required npm scripts.
+5. Automated tests.
+6. A production build and documented launch instructions.
+7. A README with prerequisites, installation, development, usage, keyboard shortcuts, build commands, security notes and known limitations.
+8. A concise summary of the implementation and actual verification results.
+
+The README must describe the current application state. Do not include changelog, history or development diary sections.
+
+Do not omit files by claiming they are unchanged or too lengthy.
+
+## 19. Acceptance criteria
+
+The application is accepted only when:
+
+- All required npm scripts execute successfully.
+- The Tauri application builds with documented prerequisites.
+- Read, Edit and Split modes work correctly.
+- Multiple documents can be opened, switched and closed.
+- Unsaved edits survive mode transitions.
+- File picker, drag-and-drop and clipboard input work.
+- Required GFM features, syntax highlighting, KaTeX and Mermaid render correctly.
+- Search, TOC, heading anchors and scroll-spy work.
+- Theme and workspace preferences persist.
+- Export and printing work as documented.
+- Relative assets behave correctly for supported source types.
+- Storage failures do not crash the application or silently destroy unsaved content.
+- Malicious Markdown remains inert in the viewer and exported HTML.
+- Keyboard-only users can operate all important features.
+- The 200 KB performance benchmark is run and reported.
+- Large documents are handled without unacceptable UI freezes.
+- Tests demonstrate the intended behavior rather than merely asserting that components exist.
+- No unsupported claims of successful builds, tests or performance are made.
+
+## 20. Final working instructions
+
+Proceed in dependency order:
+
+1. Inspect the repository and REA skill instructions.
+2. Report assumptions briefly.
+3. Establish the application scaffold and native/frontend boundary.
+4. Implement the document model, tab lifecycle and workspace mode state.
+5. Implement and test the secure Markdown pipeline.
+6. Implement the editor, preview, Read/Edit/Split modes and navigation.
+7. Implement search, persistence, theming, export and printing.
+8. Run tests, lint, type checking, frontend production build and Tauri build.
+9. Fix failures and rerun relevant checks.
+10. Report actual results, remaining limitations and how to launch the application.
+
+Keep the project runnable throughout development where practical.
+
+Do not add features beyond this specification. Do not substitute a plan for working code. Preserve existing useful work, follow the installed REA skill's documented workflow, and deliver the finished implementation.

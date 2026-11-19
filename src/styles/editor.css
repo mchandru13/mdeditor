@@ -1,0 +1,57 @@
+.editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+
+.editor .cm-editor {
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.editor .cm-scroller {
+  font-family: inherit;
+  line-height: 1.6;
+  overflow: auto;
+}
+
+.editor .cm-content {
+  padding: 12px 0;
+  caret-color: var(--accent);
+}
+
+.editor .cm-gutters {
+  background: var(--bg-inset);
+  color: var(--text-faint);
+  border-right: 1px solid var(--border);
+}
+
+.editor .cm-activeLineGutter {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+}
+
+.editor .cm-activeLine {
+  background: color-mix(in srgb, var(--accent-soft) 45%, transparent);
+}
+
+.editor .cm-selectionBackground,
+.editor .cm-content ::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent) !important;
+}
+
+.editor .cm-cursor {
+  border-left-color: var(--accent);
+}
+
+.editor .cm-line {
+  padding: 0 12px;
+}

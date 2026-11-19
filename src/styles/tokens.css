@@ -1,0 +1,136 @@
+:root {
+  color-scheme: light;
+
+  --bg: #f7f7f8;
+  --bg-elevated: #ffffff;
+  --bg-inset: #f0f1f3;
+  --bg-hover: #eceef1;
+  --bg-active: #e3e6ea;
+
+  --text: #1c1e21;
+  --text-muted: #5c636b;
+  --text-faint: #868d95;
+
+  --border: #d8dbe0;
+  --border-strong: #c2c7cd;
+
+  --accent: #1b64c4;
+  --accent-hover: #17539f;
+  --accent-soft: #e5eefb;
+  --accent-text: #ffffff;
+
+  --danger: #b3261e;
+  --danger-soft: #fbe9e7;
+  --warning: #8a5a00;
+  --warning-soft: #fdf3e0;
+
+  --md-heading: #123a6b;
+  --md-code: #7a2f8a;
+  --md-keyword: #9b1d5c;
+  --md-string: #1a6b3c;
+  --md-number: #8a4b00;
+  --md-comment: #6b7280;
+  --md-mark: #5c636b;
+
+  --search-hit: #ffe066;
+  --search-hit-active: #ffb020;
+
+  --font-ui: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', 'SF Mono', ui-monospace, monospace;
+
+  --radius: 6px;
+  --radius-sm: 4px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 8%), 0 4px 12px rgb(0 0 0 / 6%);
+
+  --toolbar-height: 44px;
+  --tabbar-height: 34px;
+  --statusbar-height: 26px;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #1b1d21;
+  --bg-elevated: #23262b;
+  --bg-inset: #2a2e34;
+  --bg-hover: #2f343b;
+  --bg-active: #39404a;
+
+  --text: #e6e8ea;
+  --text-muted: #a7adb6;
+  --text-faint: #7d848d;
+
+  --border: #343940;
+  --border-strong: #454c55;
+
+  --accent: #6aa8f5;
+  --accent-hover: #8bbcf7;
+  --accent-soft: #22344d;
+  --accent-text: #0f1a29;
+
+  --danger: #f28b82;
+  --danger-soft: #3a2322;
+  --warning: #f5c26b;
+  --warning-soft: #3a2f1c;
+
+  --md-heading: #9cc7ff;
+  --md-code: #e0a6f5;
+  --md-keyword: #ff8ab8;
+  --md-string: #8fd6a8;
+  --md-number: #f0b072;
+  --md-comment: #8b919a;
+  --md-mark: #a7adb6;
+
+  --search-hit: #6b5a00;
+  --search-hit-active: #a37a00;
+
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 6px 18px rgb(0 0 0 / 30%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

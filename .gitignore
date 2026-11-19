@@ -1,0 +1,24 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+coverage/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# logs and scratch
+*.log
+npm-debug.log*
+.lighthouse/
+bench/
