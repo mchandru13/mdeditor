@@ -34,7 +34,15 @@ npm run build        # type-check and produce dist/
 npm run tauri:build  # produce installers in src-tauri/target/release/bundle/
 ```
 
-Windows bundles are generated for **NSIS** (`.exe`) and **WiX** (`.msi`). The application executable is `src-tauri/target/release/mdeditor.exe`. Icons live in `src-tauri/icons/` and are generated from `app-icon.png` with `npx tauri icon app-icon.png`.
+Windows bundles are generated for **NSIS** (`.exe`) and **WiX** (`.msi`). Verified outputs from the reference build:
+
+| Artifact | Size |
+|---|---|
+| `src-tauri/target/release/mdeditor.exe` | 13.1 MiB |
+| `src-tauri/target/release/bundle/nsis/Markdown Editor_1.0.0_x64-setup.exe` | 10.2 MiB |
+| `src-tauri/target/release/bundle/msi/Markdown Editor_1.0.0_x64_en-US.msi` | 10.8 MiB |
+
+Icons live in `src-tauri/icons/` and are generated from `app-icon.png` with `npx tauri icon app-icon.png`.
 
 ## npm scripts
 
@@ -162,7 +170,7 @@ These fixtures are deliberately dense: roughly 340 code fences, 340 Mermaid bloc
 ## Testing
 
 ```bash
-npm test        # 145 tests (Vitest + React Testing Library, jsdom)
+npm test        # 148 tests (Vitest + React Testing Library, jsdom)
 npm run test:rust  # 21 tests (cargo test)
 ```
 
@@ -175,6 +183,38 @@ Coverage:
 - **Integration:** mode switching and layout, unsaved edits surviving every transition, tab independence, save and failed save, search navigation, remote URL validation and fetch errors, keyboard shortcuts, ARIA roles and tab focus movement.
 
 **Not covered by automation:** the native window, real file dialogs and drag-and-drop, WebView2 rendering, Mermaid/KaTeX visual output, and printing. These are verified manually against the packaged build. CodeMirror is replaced by a controlled textarea in the integration tests; the real editor is exercised only in the browser.
+
+### Manual smoke checklist (packaged build)
+
+1. `npm run tauri:build`, then run `src-tauri/target/release/mdeditor.exe`.
+2. Open a `.md` file with the picker; confirm the tab title, status bar path and rendered content.
+3. Drag a second file onto the window; confirm a second tab and that switching tabs keeps each scroll position.
+4. Edit in Split Mode; confirm the preview updates after typing stops and that bold, tables, task lists and code highlight correctly.
+5. Add a `mermaid` fence and a `$x^2$` expression; confirm the diagram and math render, and that an invalid diagram shows the source plus an error card.
+6. Press Ctrl+F, search for a word, and step through matches with Enter and Shift+Enter in Read, Edit and Split.
+7. Switch modes with Ctrl+1/2/3 across every transition; confirm no edits are lost and the tab keeps its dirty dot.
+8. Save with Ctrl+S, close the tab while modified, and confirm the discard prompt appears; cancel and confirm the tab stays.
+9. Export HTML and open the file in a browser with the network disabled; confirm styling, math and diagrams render and the console shows no CSP or script errors.
+10. Print with Ctrl+P and confirm the print preview contains only the document.
+11. Open a URL with a non-HTTPS scheme; confirm it is rejected before any request.
+12. Restart the application and confirm the tabs, theme, mode and layout return.
+
+## Verification summary
+
+Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
+
+| Check | Command | Result |
+|---|---|---|
+| Type checking | `npm run typecheck` | passed, no diagnostics |
+| Linting | `npm run lint` | passed, 0 errors, 0 warnings |
+| Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
+| Unit and integration tests | `npm test` | 149 passed |
+| Native tests | `npm run test:rust` | 23 passed |
+| Desktop release build | `npm run tauri:build` | passed; NSIS 10.15 MiB and MSI 10.77 MiB |
+| Packaged app boot | run `src-tauri/target/release/mdeditor.exe` | process stayed alive, React mounted, and `%APPDATA%\com.rea.mdeditor\settings.json` was written through IPC with the expected defaults |
+| Benchmark | `npm run bench` | see Performance: 200 KB in ~614 ms of pipeline time, 5 MB in ~30 s |
+
+The boot check is what confirms the CSP, the bundled scripts, the platform layer and the Rust command round-trip actually work in WebView2; the rest of the native surface (dialogs, drag-and-drop, printing) is covered by the manual checklist above.
 
 ## Known limitations
 

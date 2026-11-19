@@ -4,7 +4,7 @@
  * of external dependencies. If a font cannot be resolved the CSS keeps its
  * original reference and the export report says fonts were not embedded. */
 
-import katexCssText from 'katex/dist/katex.min.css?inline';
+import katexCssText from 'katex/dist/katex.min.css?raw';
 
 const fontModules: Record<string, unknown> = import.meta.glob(
   '../../node_modules/katex/dist/fonts/*.woff2',

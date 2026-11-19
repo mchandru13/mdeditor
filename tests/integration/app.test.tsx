@@ -322,8 +322,50 @@ describe('remote documents', () => {
   });
 });
 
-describe('accessibility', () => {
-  it('exposes named controls and a tablist', async () => {
+describe('preferences', () => {
+  it('persists the workspace mode and theme', async () => {
+    const { platform } = renderApp({}, 'split');
+
+    fireEvent.keyDown(window, { key: '1', ctrlKey: true });
+    fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'dark' } });
+
+    await waitFor(
+      () => {
+        expect(platform.settingsWrites.length).toBeGreaterThan(0);
+      },
+      { timeout: 4000 },
+    );
+
+    const latest = platform.settingsWrites.at(-1);
+    const parsed = JSON.parse(latest ?? '{}') as { mode?: string; theme?: string };
+    expect(parsed.mode).toBe('read');
+    expect(parsed.theme).toBe('dark');
+  });
+
+  it('restores persisted preferences on start', async () => {
+    const settings = JSON.stringify({
+      version: 1,
+      theme: 'dark',
+      mode: 'edit',
+      tocVisible: false,
+      splitRatio: 0.3,
+      docs: [],
+      activeIndex: 0,
+    });
+
+    renderApp({ settings });
+
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe('dark');
+    });
+
+    const radios = screen.getAllByRole('radio');
+    const edit = radios.find((radio) => radio.textContent === 'Edit');
+    expect(edit).toHaveAttribute('aria-checked', 'true');
+  });
+});
+
+describe('accessibility', () => {  it('exposes named controls and a tablist', async () => {
     await openFromClipboard('text');
 
     expect(screen.getByRole('toolbar', { name: 'Document actions' })).toBeInTheDocument();

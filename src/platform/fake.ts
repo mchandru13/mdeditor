@@ -48,7 +48,7 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
     },
 
     assetUrl(path) {
-      return `http://asset.localhost/${encodeURIComponent(path.replace(/\\/g, '/'))}`;
+      return `http://asset.localhost/${encodeURIComponent(path)}`;
     },
 
     async openFileDialog() {
@@ -117,6 +117,10 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
     },
 
     async confirmDiscard() {
+      return options.confirmResult ?? true;
+    },
+
+    async confirmAction() {
       return options.confirmResult ?? true;
     },
 

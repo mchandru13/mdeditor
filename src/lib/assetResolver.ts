@@ -9,13 +9,13 @@ export function isAbsoluteLike(url: string): boolean {
 }
 
 /**
- * Builds the URL Tauri's asset protocol serves for an absolute local path.
- * Matches `convertFileSrc` from `@tauri-apps/api/core`:
- * `http://asset.localhost/<encodeURIComponent(path)>`.
+ * Builds the URL Tauri's asset protocol serves for a local path. Mirrors
+ * `convertFileSrc` exactly: `http://asset.localhost/<encodeURIComponent(path)>`
+ * on Windows, `asset://localhost/<encodeURIComponent(path)>` elsewhere. The path
+ * is encoded as-is, backslashes included.
  */
 export function assetUrlFor(path: string, assetOrigin: string): string {
-  const normalised = path.replace(/\\/g, '/');
-  return `${assetOrigin.replace(/\/+$/, '')}/${encodeURIComponent(normalised)}`;
+  return `${assetOrigin.replace(/\/+$/, '')}/${encodeURIComponent(path)}`;
 }
 
 function isInside(baseDir: string, candidate: string): boolean {

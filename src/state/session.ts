@@ -147,16 +147,19 @@ export function parseSettings(raw: string | null): PersistedSettings | null {
   const mode = MODES.includes(parsed.mode as WorkspaceMode) ? (parsed.mode as WorkspaceMode) : 'split';
 
   const docs: PersistedDoc[] = Array.isArray(parsed.docs)
-    ? parsed.docs.filter(isRecord).map((doc) => ({
-        title: typeof doc.title === 'string' ? doc.title : 'Untitled',
-        origin: parseOrigin(doc.origin),
-        recoverySource:
-          typeof doc.recoverySource === 'string'
-            ? doc.recoverySource.slice(0, RECOVERY_DOC_BYTES)
-            : null,
-        encoding: parseEncoding(doc.encoding),
-        scroll: parseScroll(doc.scroll),
-      }))
+    ? parsed.docs
+        .filter(isRecord)
+        .slice(0, 50)
+        .map((doc) => ({
+          title: typeof doc.title === 'string' ? doc.title : 'Untitled',
+          origin: parseOrigin(doc.origin),
+          recoverySource:
+            typeof doc.recoverySource === 'string'
+              ? doc.recoverySource.slice(0, RECOVERY_DOC_BYTES)
+              : null,
+          encoding: parseEncoding(doc.encoding),
+          scroll: parseScroll(doc.scroll),
+        }))
     : [];
 
   const activeIndex =

@@ -54,7 +54,7 @@ fn allow_asset_dir(app: AppHandle, dir: String) -> Result<(), String> {
         return Err(format!("Not a directory: {}", path.display()));
     }
     app.asset_protocol_scope()
-        .allow_directory(&path, false)
+        .allow_directory(&path, true)
         .map_err(|err| err.to_string())
 }
 

@@ -7,6 +7,7 @@ import {
   formatReport,
   inlineKatexFonts,
 } from '../../src/lib/exportHtml';
+import { KATEX_CSS, KATEX_FONTS } from '../../src/lib/katexAssets';
 import { renderMarkdown } from '../../src/lib/markdownPipeline';
 import type { RenderOptions } from '../../src/lib/types';
 
@@ -96,6 +97,18 @@ describe('standalone HTML export', () => {
     expect(remote.html).toContain('https://example.com/a.png');
   });
 
+  it('replaces plain-http images, which the export CSP blocks', async () => {
+    const { html, report } = await buildStandaloneHtml({
+      ...baseOptions,
+      tree: treeFor('![a](http://example.com/a.png)'),
+    });
+
+    expect(report.imagesRemote).toBe(0);
+    expect(report.imagesUnavailable).toBe(1);
+    expect(html).not.toContain('http://example.com/a.png');
+    expect(html).toContain('missing image');
+  });
+
   it('refuses exports above the size limit', async () => {
     await expect(
       buildStandaloneHtml({
@@ -134,6 +147,14 @@ describe('standalone HTML export', () => {
 });
 
 describe('KaTeX font inlining', () => {
+  it('bundles the stylesheet and the fonts the exporter needs', () => {
+    expect(KATEX_CSS).toContain('@font-face');
+    expect(Object.keys(KATEX_FONTS).length).toBeGreaterThan(0);
+
+    const { embedded } = inlineKatexFonts(KATEX_CSS, KATEX_FONTS);
+    expect(embedded).toBeGreaterThan(0);
+  });
+
   it('replaces font URLs with data URLs when available', () => {
     const css = '@font-face{src:url(fonts/KaTeX_Main-Regular.woff2) format("woff2")}';
     const { css: output, embedded } = inlineKatexFonts(css, {

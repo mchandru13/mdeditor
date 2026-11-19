@@ -199,8 +199,14 @@ export async function buildStandaloneHtml(options: ExportOptions): Promise<{
       }
     } else if (/^https:\/\//i.test(src)) {
       report.imagesRemote += 1;
-    } else if (/^https?:\/\//i.test(src)) {
-      report.imagesRemote += 1;
+    } else {
+      // Plain-http images are not embedded and are blocked by the export CSP,
+      // so they become an explicit placeholder instead of a broken image.
+      const alt = typeof image.properties.alt === 'string' ? image.properties.alt : 'image';
+      image.tagName = 'span';
+      image.properties = { className: ['image-missing'] };
+      image.children = [{ type: 'text', value: `[missing image: ${alt}]` }];
+      report.imagesUnavailable += 1;
     }
   }
 

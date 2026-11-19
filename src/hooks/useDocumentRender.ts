@@ -71,7 +71,13 @@ export function useDocumentRender(
     rendererRef.current = createRenderer();
   }
 
-  useEffect(() => () => rendererRef.current?.dispose(), [rendererRef]);
+  useEffect(
+    () => () => {
+      rendererRef.current?.dispose();
+      rendererRef.current = null;
+    },
+    [rendererRef],
+  );
 
   const large = (doc?.source.length ?? 0) > AUTO_PREVIEW_LIMIT;
   const requiresManualRender = large && manualDocId !== doc?.id;

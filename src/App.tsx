@@ -52,6 +52,11 @@ export interface AppProps {
   initialMode?: WorkspaceMode;
 }
 
+/** Larger files are refused rather than silently degrading (§14.3). */
+const MAX_DOCUMENT_CHARS = 20 * 1024 * 1024;
+/** Soft tab limit; opening beyond it asks for confirmation. */
+const MAX_TABS = 50;
+
 function remoteTitle(url: string): string {
   const clean = url.split('#')[0]?.split('?')[0] ?? url;
   const name = clean.slice(clean.lastIndexOf('/') + 1);
@@ -102,6 +107,10 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const previewMode = mode !== 'edit';
   const render = useDocumentRender(doc, mode, platform, rendererRef);
 
+  const onAnchor = useCallback((id: string) => {
+    viewerRef.current?.scrollToHeading(id);
+  }, []);
+
   const headings = useMemo(() => render.output?.headings ?? [], [render.output]);
   const activeHeading = useScrollSpy(viewerElementRef, headings, previewMode);
 
@@ -126,8 +135,21 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         return;
       }
 
+      if (stateRef.current.docs.length >= MAX_TABS) {
+        const proceed = await platform.confirmAction(
+          `${MAX_TABS} documents are already open. Open another one?`,
+        );
+        if (!proceed) return;
+      }
+
       try {
         const { text, bom } = await platform.readFile(path);
+        if (text.length > MAX_DOCUMENT_CHARS) {
+          setMessage(
+            `${fileTitle(path)} is larger than 20 MB. Split it into smaller documents to open it.`,
+          );
+          return;
+        }
         const info = detectEncoding(text);
         const dir = parentDir(path);
         lastDirRef.current = dir;
@@ -302,6 +324,15 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     void (async () => {
       try {
         const { text, bom } = await platform.readFile(path);
+        if (text.length > MAX_DOCUMENT_CHARS) {
+          dispatch({
+            type: 'status',
+            id: doc.id,
+            status: 'error',
+            error: 'File is larger than 20 MB and was not restored.',
+          });
+          return;
+        }
         const info = detectEncoding(text);
         const source = toEditorText(text);
         dispatch({ type: 'reload', id: doc.id, source, savedSource: source, encoding: { bom, eol: info.eol } });
@@ -463,6 +494,17 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
   /* ------------------------------------------------------------------- scroll */
 
+  // Restore the stored preview position whenever the viewer remounts (tab or
+  // mode change). The editor restores through its own `initialScroll` prop.
+  const restoredScrollRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!doc || mode === 'edit' || !render.output) return;
+    const key = `${doc.id}:${mode}`;
+    if (restoredScrollRef.current === key) return;
+    restoredScrollRef.current = key;
+    viewerRef.current?.restoreScroll(doc.scroll.preview);
+  }, [doc, mode, render.output]);
+
   const onEditorScroll = useCallback(
     (top: number) => {
       if (!syncScroll || mode !== 'split' || !previewMode) return;
@@ -536,7 +578,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   }, [platform, render.output]);
 
   const copyRenderedHtml = useCallback(async () => {
-    const body = document.querySelector('.markdown-body');
+    const body = viewerElementRef.current?.querySelector('.markdown-body');
     if (!body) {
       setMessage('Open the document in Read or Split mode before copying HTML.');
       return;
@@ -717,7 +759,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
                       <MarkdownView
                         tree={render.output.hast}
                         theme={resolvedTheme}
-                        onAnchor={(id) => viewerRef.current?.scrollToHeading(id)}
+                        onAnchor={onAnchor}
                       />
                     ) : null}
                   </Viewer>

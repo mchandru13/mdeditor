@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime';
 import { toJsxRuntime } from 'hast-util-to-jsx-runtime';
@@ -47,7 +47,7 @@ interface MarkdownViewProps {
  * Converts sanitized HAST to React elements. Placeholders are the only custom
  * elements: math and diagrams are rendered by components, never as HTML strings.
  */
-export function MarkdownView({ tree, theme, onAnchor }: MarkdownViewProps) {
+export const MarkdownView = memo(function MarkdownView({ tree, theme, onAnchor }: MarkdownViewProps) {
   const platform = usePlatform();
 
   const components = useMemo<Components>(() => {
@@ -126,4 +126,4 @@ export function MarkdownView({ tree, theme, onAnchor }: MarkdownViewProps) {
     components,
     passNode: true,
   }) as ReactElement;
-}
+});

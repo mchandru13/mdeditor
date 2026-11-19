@@ -116,6 +116,10 @@ export function createTauriPlatform(): Platform {
       });
     },
 
+    async confirmAction(message) {
+      return ask(message, { title: 'Markdown Editor', kind: 'warning' });
+    },
+
     async startupUrl() {
       return invoke<string | null>('startup_url');
     },

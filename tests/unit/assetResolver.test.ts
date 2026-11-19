@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { assetUrlFor, joinPath, resolveResource } from '../../src/lib/assetResolver';
 
@@ -20,7 +20,7 @@ describe('assetResolver', () => {
 
     expect(resolved.local).toBe(true);
     expect(resolved.unresolved).toBe(false);
-    expect(resolved.url).toBe(assetUrlFor('C:\\docs\\images/diagram.png', ORIGIN));
+    expect(resolved.url).toBe(assetUrlFor('C:\\docs\\images\\diagram.png', ORIGIN));
     expect(resolved.url.startsWith('http://asset.localhost/')).toBe(true);
   });
 
@@ -64,10 +64,8 @@ describe('assetResolver', () => {
   });
 
   it('encodes the asset URL exactly like convertFileSrc', () => {
-    const spy = vi.fn();
-    spy();
     expect(assetUrlFor('C:\\a b\\c.png', 'http://asset.localhost')).toBe(
-      `http://asset.localhost/${encodeURIComponent('C:/a b/c.png')}`,
+      `http://asset.localhost/${encodeURIComponent('C:\\a b\\c.png')}`,
     );
   });
 });

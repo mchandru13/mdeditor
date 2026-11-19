@@ -30,6 +30,7 @@ pub enum RemoteError {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct RemoteDocument {
     pub text: String,
     pub final_url: String,
@@ -191,5 +192,24 @@ mod tests {
         let html = url::Url::parse("https://example.com/a.html").expect("url");
         assert!(content_type_is_markdown(None, &md));
         assert!(!content_type_is_markdown(None, &html));
+    }
+
+    #[test]
+    fn serializes_camel_case_keys_for_the_webview() {
+        let document = RemoteDocument {
+            text: "# hi".to_string(),
+            final_url: "https://example.com/a.md".to_string(),
+        };
+
+        let json = serde_json::to_string(&document).expect("serialize");
+        assert!(json.contains("\"finalUrl\""), "{json}");
+        assert!(!json.contains("final_url"), "{json}");
+    }
+
+    #[test]
+    fn deserializes_camel_case_payloads() {
+        let document: RemoteDocument =
+            serde_json::from_str(r#"{"text":"x","finalUrl":"https://e.test/a.md"}"#).expect("parse");
+        assert_eq!(document.final_url, "https://e.test/a.md");
     }
 }
