@@ -215,7 +215,7 @@ Lighthouse cannot interact with the application, so this measures the **empty wo
 ## Testing
 
 ```bash
-npm test        # 191 tests (Vitest + React Testing Library, jsdom)
+npm test        # 193 tests (Vitest + React Testing Library, jsdom)
 npm run test:rust  # 25 tests (cargo test)
 ```
 
@@ -274,7 +274,7 @@ Everything below was executed on the reference machine (11th Gen Intel Core i5-1
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 191 passed |
+| Unit and integration tests | `npm test` | 193 passed |
 | Native tests | `npm run test:rust` | 25 passed |
 | Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
@@ -286,6 +286,9 @@ Everything below was executed on the reference machine (11th Gen Intel Core i5-1
 | Lighthouse (production bundle) | `npx lighthouse http://localhost:4173` | performance 97 on the empty shell (see the caveat in Performance) |
 
 The boot check is what confirms the CSP, the bundled scripts, the platform layer and the Rust command round-trip actually work in WebView2; the rest of the native surface (dialogs, drag-and-drop, printing) is covered by the manual checklist above.
+
+The README describes the current application state; `ROADMAP.md` lists the
+remaining work, deliberate limitations and unverified areas.
 
 ## Known limitations
 
