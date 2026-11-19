@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 export type ShortcutName =
+  | 'mod+n'
   | 'mod+1'
   | 'mod+2'
   | 'mod+3'
@@ -24,6 +25,7 @@ function shortcutFor(event: KeyboardEvent): ShortcutName | null {
   }
 
   if (key === '1') return 'mod+1';
+  if (key === 'n') return 'mod+n';
   if (key === '2') return 'mod+2';
   if (key === '3') return 'mod+3';
   if (key === 'f') return 'mod+f';

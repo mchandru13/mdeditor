@@ -6,6 +6,7 @@ interface ToolbarProps {
   tocVisible: boolean;
   syncScroll: boolean;
   theme: ThemeMode;
+  onNew: () => void;
   onOpen: () => void;
   onOpenUrl: () => void;
   onPasteNew: () => void;
@@ -25,6 +26,7 @@ export function Toolbar({
   tocVisible,
   syncScroll,
   theme,
+  onNew,
   onOpen,
   onOpenUrl,
   onPasteNew,
@@ -40,6 +42,9 @@ export function Toolbar({
   return (
     <div className="toolbar" role="toolbar" aria-label="Document actions">
       <div className="toolbar-group">
+        <button type="button" className="button" onClick={onNew} title="Ctrl+N">
+          New
+        </button>
         <button type="button" className="button" onClick={onOpen} title="Ctrl+O">
           Open
         </button>

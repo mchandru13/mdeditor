@@ -71,7 +71,7 @@ A native Windows menu bar exposes every action and its accelerator:
 
 | Menu | Items |
 |---|---|
-| File | Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, Print… (Ctrl+P), Exit |
+| File | New (Ctrl+N), Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, Print… (Ctrl+P), Exit |
 | Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F) |
 | View | Read Mode (Ctrl+1), Edit Mode (Ctrl+2), Split Mode (Ctrl+3), Toggle Contents, Toggle Sync Scroll, Theme ▸ Light / Dark / System |
 | Help | Keyboard Shortcuts, About Markdown Editor |
@@ -80,6 +80,7 @@ The menu, the toolbar and the keyboard shortcuts all call the same handlers, so 
 
 ### Opening documents
 
+- **New** (Ctrl+N) creates an empty untitled document, numbered (`Untitled 1`, `Untitled 2`, …).
 - **Open** (Ctrl+O) uses the native file picker and accepts `.md` and `.markdown`.
 - **Drag and drop** a file onto the window. Other extensions are rejected with a message.
 - **From clipboard** creates a new unsaved document from clipboard text.
@@ -101,6 +102,7 @@ Switching modes never reloads from disk, never discards edits and never creates 
 
 | Shortcut | Action |
 |---|---|
+| Ctrl+N | New document |
 | Ctrl+1 / Ctrl+2 / Ctrl+3 | Read / Edit / Split |
 | Ctrl+F | Search in the current document |
 | Enter / Shift+Enter | Next / previous match (while search is open) |
@@ -196,7 +198,7 @@ Lighthouse cannot interact with the application, so this measures the **empty wo
 ## Testing
 
 ```bash
-npm test        # 171 tests (Vitest + React Testing Library, jsdom)
+npm test        # 182 tests (Vitest + React Testing Library, jsdom)
 npm run test:rust  # 21 tests (cargo test)
 ```
 
@@ -252,7 +254,7 @@ Everything below was executed on the reference machine (11th Gen Intel Core i5-1
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 171 passed |
+| Unit and integration tests | `npm test` | 182 passed |
 | Native tests | `npm run test:rust` | 23 passed |
 | Browser rendering check | `npm run check:ui` | 17/17 assertions passed against the production bundle |
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |

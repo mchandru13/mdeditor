@@ -433,6 +433,59 @@ describe('menu commands', () => {
   });
 });
 
+describe('new documents', () => {
+  it('creates an untitled document from the File menu', async () => {
+    const { platform } = renderApp();
+
+    await act(async () => {
+      platform.emitMenu('file.new');
+    });
+
+    expect(await screen.findByRole('tab', { name: /Untitled 1/ })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Unsaved changes')).toBeNull();
+  });
+
+  it('numbers new documents without reusing titles', async () => {
+    const { platform } = renderApp();
+
+    await act(async () => {
+      platform.emitMenu('file.new');
+    });
+    await screen.findByRole('tab', { name: /Untitled 1/ });
+
+    await act(async () => {
+      platform.emitMenu('file.new');
+    });
+    expect(await screen.findByRole('tab', { name: /Untitled 2/ })).toBeInTheDocument();
+  });
+
+  it('creates a document with Ctrl+N', async () => {
+    renderApp();
+    fireEvent.keyDown(window, { key: 'n', ctrlKey: true });
+
+    expect(await screen.findByRole('tab', { name: /Untitled 1/ })).toBeInTheDocument();
+  });
+
+  it('saves a new document through Save As', async () => {
+    const { platform } = renderApp({ savePath: 'C:\\out\\fresh.md' });
+
+    await act(async () => {
+      platform.emitMenu('file.new');
+    });
+    await screen.findByRole('tab', { name: /Untitled 1/ });
+
+    fireEvent.change(await screen.findByLabelText('Markdown source editor'), {
+      target: { value: '# fresh\n' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(platform.files.get('C:\\out\\fresh.md')).toContain('# fresh');
+    });
+    expect(await screen.findByRole('tab', { name: /fresh.md/ })).toBeInTheDocument();
+  });
+});
+
 describe('preferences', () => {
   it('persists the workspace mode and theme', async () => {
     const { platform } = renderApp({}, 'split');

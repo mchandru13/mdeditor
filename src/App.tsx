@@ -383,6 +383,23 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     if (path) await openPath(path);
   }, [platform, openPath]);
 
+  /** Creates an empty untitled document, numbered to keep tabs distinguishable. */
+  const newDocument = useCallback(() => {
+    const titles = new Set(stateRef.current.docs.map((entry) => entry.title));
+    let index = 1;
+    while (titles.has(`Untitled ${index}`)) index += 1;
+
+    dispatch({
+      type: 'open',
+      doc: createDocument({
+        title: `Untitled ${index}`,
+        origin: null,
+        source: '',
+        savedSource: '',
+      }),
+    });
+  }, []);
+
   const newFromClipboard = useCallback(async () => {
     try {
       const text = await platform.readClipboard();
@@ -470,6 +487,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
   const shortcuts = useMemo(
     () => ({
+      'mod+n': () => newDocument(),
       'mod+1': () => setMode('read'),
       'mod+2': () => setMode('edit'),
       'mod+3': () => setMode('split'),
@@ -492,7 +510,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         else if (urlDialogOpen) setUrlDialogOpen(false);
       },
     }),
-    [closeDocument, closeSearch, openFromDialog, saveDocument, searchOpen, urlDialogOpen],
+    [closeDocument, closeSearch, newDocument, openFromDialog, saveDocument, searchOpen, urlDialogOpen],
   );
 
   useShortcuts(shortcuts);
@@ -647,6 +665,9 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
       const current = activeDocument(stateRef.current);
 
       switch (commandId) {
+        case 'file.new':
+          newDocument();
+          break;
         case 'file.open':
           void openFromDialog();
           break;
@@ -719,6 +740,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   }, [
     attemptClose,
     exportHtml,
+    newDocument,
     newFromClipboard,
     openFromDialog,
     platform,
@@ -763,6 +785,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
             tocVisible={tocVisible}
             syncScroll={syncScroll}
             theme={theme}
+            onNew={() => newDocument()}
             onOpen={() => void openFromDialog()}
             onOpenUrl={() => setUrlDialogOpen(true)}
             onPasteNew={() => void newFromClipboard()}

@@ -18,6 +18,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         "File",
         true,
         &[
+            &MenuItem::with_id(app, "file.new", "New", true, Some("CmdOrCtrl+N"))?,
             &MenuItem::with_id(app, "file.open", "Open…", true, Some("CmdOrCtrl+O"))?,
             &MenuItem::with_id(app, "file.openUrl", "Open from URL…", true, None::<&str>)?,
             &MenuItem::with_id(app, "file.clipboard", "New from Clipboard", true, None::<&str>)?,
