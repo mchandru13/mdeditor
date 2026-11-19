@@ -76,6 +76,8 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [replacement, setReplacement] = useState('');
+  const [replaceVisible, setReplaceVisible] = useState(false);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [textMatches, setTextMatches] = useState<TextMatch[]>([]);
   const [sourceMatches, setSourceMatches] = useState<SourceMatch[]>([]);
@@ -94,6 +96,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const editorRef = useRef<EditorHandle | null>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const highlighterRef = useRef<Highlighter | null>(null);
+  const searchKeyRef = useRef('');
   const stateRef = useRef(documents);
   const lastDirRef = useRef<string | null>(null);
   const hydratingRef = useRef(new Set<DocId>());
@@ -158,6 +161,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         await platform.allowAssetDir(dir);
 
         const source = toEditorText(text);
+        const diskModifiedAt = await platform.modifiedTime(path);
         dispatch({
           type: 'open',
           doc: createDocument({
@@ -166,6 +170,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
             source,
             savedSource: source,
             encoding: { bom, eol: info.eol },
+            diskModifiedAt,
           }),
         });
       } catch (error) {
@@ -217,6 +222,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
       setSaving(true);
       try {
         await platform.writeFile(path, toFileText(target.source, target.encoding), target.encoding.bom);
+        const diskModifiedAt = await platform.modifiedTime(path);
         dispatch({
           type: 'saved',
           id: target.id,
@@ -224,6 +230,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
           origin: { kind: 'file', path, dir: parentDir(path) },
           title: fileTitle(path),
           encoding: target.encoding,
+          diskModifiedAt,
         });
         setMessage('Saved');
       } catch (error) {
@@ -346,7 +353,14 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         }
         const info = detectEncoding(text);
         const source = toEditorText(text);
-        dispatch({ type: 'reload', id: doc.id, source, savedSource: source, encoding: { bom, eol: info.eol } });
+        dispatch({
+          type: 'reload',
+          id: doc.id,
+          source,
+          savedSource: source,
+          encoding: { bom, eol: info.eol },
+          diskModifiedAt: await platform.modifiedTime(path),
+        });
         await platform.allowAssetDir(dir);
       } catch (error) {
         dispatch({ type: 'status', id: doc.id, status: 'missing', error: describe(error) });
@@ -431,11 +445,21 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
       return;
     }
 
+    // Keep the current index when the document changes (editing or replacing);
+    // reset it only when the query itself changes.
+    const key = `${query}\u0000${caseSensitive}\u0000${mode}`;
+    const reset = searchKeyRef.current !== key;
+    searchKeyRef.current = key;
+
+    const keep = (count: number) => {
+      setActiveMatch((current) => (reset ? 0 : Math.min(current, Math.max(0, count - 1))));
+    };
+
     if (mode === 'edit') {
       const found = findSourceMatches(doc.source, query, caseSensitive);
       setSourceMatches(found);
       setTextMatches([]);
-      setActiveMatch(0);
+      keep(found.length);
       return;
     }
 
@@ -443,7 +467,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     const found = root ? findTextMatches(root, query, caseSensitive) : [];
     setTextMatches(found);
     setSourceMatches([]);
-    setActiveMatch(0);
+    keep(found.length);
   }, [searchOpen, query, caseSensitive, mode, doc, render.output]);
 
   useEffect(() => {
@@ -477,11 +501,45 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
+    setReplaceVisible(false);
     setQuery('');
     setTextMatches([]);
     setSourceMatches([]);
     highlighterRef.current?.clear();
   }, []);
+
+  const canReplace = Boolean(doc) && mode !== 'read';
+
+  const replaceCurrent = useCallback(() => {
+    if (!doc || mode === 'read') return;
+    const match = sourceMatches[activeMatch];
+    if (!match) return;
+
+    dispatch({
+      type: 'edit',
+      id: doc.id,
+      source: `${doc.source.slice(0, match.start)}${replacement}${doc.source.slice(match.end)}`,
+    });
+  }, [activeMatch, doc, mode, replacement, sourceMatches]);
+
+  const replaceAll = useCallback(() => {
+    if (!doc || mode === 'read' || query.length === 0) return;
+
+    const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), caseSensitive ? 'g' : 'gi');
+    let count = 0;
+    const next = doc.source.replace(pattern, () => {
+      count += 1;
+      return replacement;
+    });
+
+    if (count === 0) {
+      setMessage('No matches to replace.');
+      return;
+    }
+
+    dispatch({ type: 'edit', id: doc.id, source: next });
+    setMessage(`Replaced ${count} occurrence${count === 1 ? '' : 's'}.`);
+  }, [caseSensitive, doc, mode, query, replacement]);
 
   /* ---------------------------------------------------------------- shortcuts */
 
@@ -491,7 +549,14 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
       'mod+1': () => setMode('read'),
       'mod+2': () => setMode('edit'),
       'mod+3': () => setMode('split'),
-      'mod+f': () => setSearchOpen(true),
+      'mod+f': () => {
+        setReplaceVisible(false);
+        setSearchOpen(true);
+      },
+      'mod+h': () => {
+        setReplaceVisible(true);
+        setSearchOpen(true);
+      },
       'mod+s': () => {
         const current = activeDocument(stateRef.current);
         if (current) void saveDocument(current);
@@ -699,6 +764,11 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
           editorRef.current?.redo();
           break;
         case 'edit.find':
+          setReplaceVisible(false);
+          setSearchOpen(true);
+          break;
+        case 'edit.replace':
+          setReplaceVisible(true);
           setSearchOpen(true);
           break;
         case 'view.read':
@@ -746,7 +816,59 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     platform,
     saveDocument,
   ]);
-  /* -------------------------------------------------------------------- view */
+  /* ------------------------------------------------------- external changes */
+
+  /**
+   * Detects files edited by another program. A clean buffer reloads silently; a
+   * modified buffer asks first, and keeping the local copy stops the prompt from
+   * repeating until the file changes again.
+   */
+  const checkExternalChanges = useCallback(async () => {
+    for (const entry of stateRef.current.docs) {
+      if (entry.origin?.kind !== 'file' || entry.diskModifiedAt === null) continue;
+      const path = entry.origin.path;
+
+      const modifiedAt = await platform.modifiedTime(path);
+      if (modifiedAt === null || modifiedAt <= entry.diskModifiedAt) continue;
+
+      if (isDirty(entry)) {
+        const reload = await platform.confirmAction(
+          `"${entry.title}" changed on disk. Reload it and discard the changes in this tab?`,
+        );
+        if (!reload) {
+          dispatch({ type: 'touch', id: entry.id, diskModifiedAt: modifiedAt });
+          continue;
+        }
+      }
+
+      try {
+        const { text, bom } = await platform.readFile(path);
+        const info = detectEncoding(text);
+        const source = toEditorText(text);
+        dispatch({
+          type: 'reload',
+          id: entry.id,
+          source,
+          savedSource: source,
+          encoding: { bom, eol: info.eol },
+          diskModifiedAt: modifiedAt,
+        });
+        setMessage(`"${entry.title}" was reloaded from disk.`);
+      } catch (error) {
+        dispatch({ type: 'status', id: entry.id, status: 'missing', error: describe(error) });
+      }
+    }
+  }, [platform]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      void checkExternalChanges();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [checkExternalChanges]);
+
+  /* ------------------------------------------------------------------- view */
 
   const emptyState = (
     <div className="empty-state">
@@ -896,6 +1018,12 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
               onNext={() => navigateMatch(1)}
               onPrevious={() => navigateMatch(-1)}
               onClose={closeSearch}
+              replaceVisible={replaceVisible}
+              replacement={replacement}
+              onReplacementChange={setReplacement}
+              onReplace={replaceCurrent}
+              onReplaceAll={replaceAll}
+              replaceDisabled={!canReplace}
             />
           ) : null}
         </main>

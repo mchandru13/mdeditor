@@ -87,6 +87,23 @@ pub fn read_document(path: &Path) -> Result<DocumentContents, FsError> {
     Ok(DocumentContents { text, bom })
 }
 
+/// Last-modified time in milliseconds since the Unix epoch.
+pub fn modified_time(path: &Path) -> Result<u64, FsError> {
+    let metadata = fs::metadata(path).map_err(|err| match err.kind() {
+        std::io::ErrorKind::NotFound => FsError::NotFound(path.display().to_string()),
+        _ => FsError::Io(err.to_string()),
+    })?;
+
+    let modified = metadata
+        .modified()
+        .map_err(|err| FsError::Io(err.to_string()))?;
+
+    modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|value| value.as_millis() as u64)
+        .map_err(|err| FsError::Io(err.to_string()))
+}
+
 /// Write a document atomically, restoring the BOM when the source had one.
 pub fn write_document(path: &Path, text: &str, bom: bool) -> Result<(), FsError> {
     if text.len() as u64 > MAX_DOCUMENT_BYTES {
@@ -207,5 +224,19 @@ mod tests {
             .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp"))
             .collect();
         assert!(leftovers.is_empty(), "temporary files left behind");
+    }
+
+    #[test]
+    fn reports_modification_time() {
+        let (_dir, path) = temp_file("stamp.md", b"# a\n");
+        let stamp = modified_time(&path).expect("mtime");
+        assert!(stamp > 0);
+    }
+
+    #[test]
+    fn reports_missing_file_for_modification_time() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("gone.md");
+        assert!(matches!(modified_time(&path), Err(FsError::NotFound(_))));
     }
 }

@@ -486,6 +486,183 @@ describe('new documents', () => {
   });
 });
 
+describe('replace', () => {
+  it('replaces every occurrence with Ctrl+H', async () => {
+    await openFromClipboard('alpha alpha ALPHA\n');
+
+    fireEvent.keyDown(window, { key: 'h', ctrlKey: true });
+    fireEvent.change(await screen.findByLabelText('Search text'), {
+      target: { value: 'alpha' },
+    });
+    fireEvent.change(screen.getByLabelText('Replace with'), { target: { value: 'beta' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Replace all' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Markdown source editor')).toHaveValue('beta beta beta\n');
+    });
+    expect(screen.getByText('Replaced 3 occurrences.')).toBeInTheDocument();
+  });
+
+  it('replaces only the current match', async () => {
+    await openFromClipboard('alpha alpha\n');
+
+    fireEvent.keyDown(window, { key: 'h', ctrlKey: true });
+    fireEvent.change(await screen.findByLabelText('Search text'), {
+      target: { value: 'alpha' },
+    });
+    fireEvent.change(screen.getByLabelText('Replace with'), { target: { value: 'beta' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /^Replace$/ }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Markdown source editor')).toHaveValue('beta alpha\n');
+    });
+  });
+
+  it('respects the case-sensitive toggle', async () => {
+    await openFromClipboard('alpha ALPHA\n');
+
+    fireEvent.keyDown(window, { key: 'h', ctrlKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Aa' }));
+    fireEvent.change(await screen.findByLabelText('Search text'), {
+      target: { value: 'ALPHA' },
+    });
+    fireEvent.change(screen.getByLabelText('Replace with'), { target: { value: 'X' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Replace all' }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Markdown source editor')).toHaveValue('alpha X\n');
+    });
+  });
+
+  it('disables replacement in Read Mode and explains why', async () => {
+    await openFromClipboard('alpha\n');
+
+    fireEvent.keyDown(window, { key: '1', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'h', ctrlKey: true });
+
+    expect(await screen.findByLabelText('Replace with')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Replace all' })).toBeDisabled();
+    expect(screen.getByText('Switch to Edit or Split to replace')).toBeInTheDocument();
+  });
+
+  it('keeps the current match index while replacing', async () => {
+    await openFromClipboard('a a a\n');
+
+    fireEvent.keyDown(window, { key: 'h', ctrlKey: true });
+    fireEvent.change(await screen.findByLabelText('Search text'), {
+      target: { value: 'a' },
+    });
+    fireEvent.change(screen.getByLabelText('Replace with'), { target: { value: 'b' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('1 of 3')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /^Replace$/ }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Markdown source editor')).toHaveValue('b a a\n');
+      expect(screen.getByText('1 of 2')).toBeInTheDocument();
+    });
+  });
+});
+
+describe('external file changes', () => {
+  async function openFile(path: string, platform: ReturnType<typeof createFakePlatform>) {
+    await act(async () => {
+      platform.dragDrop([path]);
+    });
+    await screen.findByRole('tab', { name: new RegExp(path.split('\\').pop() ?? '') });
+  }
+
+  it('reloads a clean buffer when the file changes on disk', async () => {
+    const { platform } = renderApp({ files: { 'C:\\docs\\a.md': '# One\n' } });
+    await openFile('C:\\docs\\a.md', platform);
+    expect(await screen.findByLabelText('Markdown source editor')).toHaveValue('# One\n');
+
+    platform.writeExternally('C:\\docs\\a.md', '# Two\n');
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Markdown source editor')).toHaveValue('# Two\n');
+    });
+    expect(screen.getByText(/was reloaded from disk/)).toBeInTheDocument();
+  });
+
+  it('asks before discarding edits and keeps them when declined', async () => {
+    const { platform } = renderApp({
+      files: { 'C:\\docs\\b.md': '# Original\n' },
+      confirmResult: false,
+    });
+    await openFile('C:\\docs\\b.md', platform);
+
+    fireEvent.change(await screen.findByLabelText('Markdown source editor'), {
+      target: { value: '# Mine\n' },
+    });
+
+    platform.writeExternally('C:\\docs\\b.md', '# Theirs\n');
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Markdown source editor')).toHaveValue('# Mine\n');
+    });
+  });
+
+  it('reloads over edits when the user confirms', async () => {
+    const { platform } = renderApp({
+      files: { 'C:\\docs\\c.md': '# Original\n' },
+      confirmResult: true,
+    });
+    await openFile('C:\\docs\\c.md', platform);
+
+    fireEvent.change(await screen.findByLabelText('Markdown source editor'), {
+      target: { value: '# Mine\n' },
+    });
+
+    platform.writeExternally('C:\\docs\\c.md', '# Theirs\n');
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Markdown source editor')).toHaveValue('# Theirs\n');
+    });
+  });
+
+  it('does not prompt again after the user keeps the local copy', async () => {
+    const { platform } = renderApp({
+      files: { 'C:\\docs\\d.md': '# Original\n' },
+      confirmResult: false,
+    });
+    await openFile('C:\\docs\\d.md', platform);
+
+    fireEvent.change(await screen.findByLabelText('Markdown source editor'), {
+      target: { value: '# Mine\n' },
+    });
+
+    platform.writeExternally('C:\\docs\\d.md', '# Theirs\n');
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    await waitFor(() => {
+      expect(screen.getByLabelText('Markdown source editor')).toHaveValue('# Mine\n');
+    });
+
+    // Same disk state, no further change: the prompt must not repeat.
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+    expect(screen.getByLabelText('Markdown source editor')).toHaveValue('# Mine\n');
+  });
+});
+
 describe('preferences', () => {
   it('persists the workspace mode and theme', async () => {
     const { platform } = renderApp({}, 'split');

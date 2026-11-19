@@ -9,6 +9,8 @@ export interface Platform {
   saveFileDialog(defaultPath?: string, kind?: 'markdown' | 'html'): Promise<string | null>;
   readFile(path: string): Promise<{ text: string; bom: boolean }>;
   writeFile(path: string, text: string, bom: boolean): Promise<void>;
+  /** Milliseconds since the epoch, or null when the file is gone. */
+  modifiedTime(path: string): Promise<number | null>;
   fetchRemote(url: string): Promise<{ text: string; finalUrl: string }>;
   allowAssetDir(dir: string): Promise<void>;
   /** Absolute path to a URL the webview may load through the asset protocol. */

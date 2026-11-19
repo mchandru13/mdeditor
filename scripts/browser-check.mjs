@@ -121,6 +121,22 @@ check('search reports a match count', /\d+ of \d+/.test(status), status);
 const tocLinks = await page.locator('.toc-link').count();
 check('table of contents lists headings', tocLinks >= 3, String(tocLinks));
 
+// ---- replace (Ctrl+H) -------------------------------------------------------
+await page.keyboard.press('Control+h');
+await page.locator('input[aria-label="Search text"]').fill('diagram');
+await page.locator('input[aria-label="Replace with"]').fill('chart');
+await page.getByRole('button', { name: 'Replace all' }).click();
+
+await page.waitForFunction(
+  () => document.querySelector('.cm-content')?.textContent?.includes('chart:') ?? false,
+  undefined,
+  { timeout: 8000 },
+);
+check('replace all edits the source', true);
+
+await page.keyboard.press('Escape');
+await page.waitForSelector('.searchbar', { state: 'detached', timeout: 5000 }).catch(() => undefined);
+
 const bodyText = await page.locator('.markdown-body').innerText();
 check('content survived every transition', bodyText.includes('Rendering check') && bodyText.includes('Typed live'));
 

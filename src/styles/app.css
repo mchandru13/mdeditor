@@ -404,13 +404,25 @@
   right: 16px;
   z-index: 5;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
   padding: 6px 8px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
+}
+
+.searchbar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.searchbar-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
 }
 
 .searchbar-input {

@@ -40,6 +40,13 @@ fn write_document(path: String, text: String, bom: bool) -> Result<(), String> {
     paths::write_document(&PathBuf::from(path), &text, bom).map_err(|err| err.to_string())
 }
 
+/// Last-modified time in milliseconds since the Unix epoch, used to detect
+/// changes made to an open file by another program.
+#[tauri::command]
+fn modified_time(path: String) -> Result<u64, String> {
+    paths::modified_time(&PathBuf::from(path)).map_err(|err| err.to_string())
+}
+
 #[tauri::command]
 async fn fetch_remote(url: String) -> Result<remote::RemoteDocument, String> {
     let client = remote::build_client().map_err(|err| err.to_string())?;
@@ -107,6 +114,7 @@ pub fn run() {
             startup_url,
             read_document,
             write_document,
+            modified_time,
             fetch_remote,
             allow_asset_dir,
             load_settings,

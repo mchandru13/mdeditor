@@ -72,7 +72,7 @@ A native Windows menu bar exposes every action and its accelerator:
 | Menu | Items |
 |---|---|
 | File | New (Ctrl+N), Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, Print… (Ctrl+P), Exit |
-| Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F) |
+| Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F), Replace… (Ctrl+H) |
 | View | Read Mode (Ctrl+1), Edit Mode (Ctrl+2), Split Mode (Ctrl+3), Toggle Contents, Toggle Sync Scroll, Theme ▸ Light / Dark / System |
 | Help | Keyboard Shortcuts, About Markdown Editor |
 
@@ -105,6 +105,7 @@ Switching modes never reloads from disk, never discards edits and never creates 
 | Ctrl+N | New document |
 | Ctrl+1 / Ctrl+2 / Ctrl+3 | Read / Edit / Split |
 | Ctrl+F | Search in the current document |
+| Ctrl+H | Find and replace |
 | Enter / Shift+Enter | Next / previous match (while search is open) |
 | Ctrl+S | Save |
 | Ctrl+Shift+S | Save As |
@@ -117,6 +118,12 @@ Shortcuts are suppressed while a modal dialog has focus. In Edit Mode, `Ctrl+F` 
 ### Search
 
 Search is application-owned. In Read and Split modes it matches rendered text nodes and highlights them with the CSS Custom Highlight API (falling back to `<mark>` elements). In Edit Mode it searches the Markdown source and selects matches in the editor. Matching stops at 5,000 results; the count then reads `5000+` while navigation continues to work.
+
+**Replace** (Ctrl+H, or Edit → Replace…) adds a second row with Replace and Replace All. Replacement edits the Markdown source, respects the case-sensitivity toggle, is undoable, and is disabled in Read Mode with a note pointing at Edit/Split — the preview itself is never mutated. The current match index is preserved while replacing, so repeated Replace walks the document.
+
+### External changes
+
+Open files are checked for modification when the window regains focus. A clean tab reloads silently; a tab with unsaved edits asks before reloading, and choosing to keep the local copy suppresses the prompt until the file changes again. A file deleted while open is marked missing rather than recreated.
 
 ### Theming and printing
 
@@ -198,8 +205,8 @@ Lighthouse cannot interact with the application, so this measures the **empty wo
 ## Testing
 
 ```bash
-npm test        # 182 tests (Vitest + React Testing Library, jsdom)
-npm run test:rust  # 21 tests (cargo test)
+npm test        # 191 tests (Vitest + React Testing Library, jsdom)
+npm run test:rust  # 25 tests (cargo test)
 ```
 
 Coverage:
@@ -226,7 +233,7 @@ npm run tauri:build      # then
 npm run check:app        # attaches to the packaged app over CDP and opens a remote document
 ```
 
-`check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, the TOC, and zero page errors. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
+`check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, replace-all, the TOC, and zero page errors. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
 
 `check:ui` needs Edge installed and a running preview server; `check:app` needs a release build and network access for the remote document.
 
@@ -254,9 +261,9 @@ Everything below was executed on the reference machine (11th Gen Intel Core i5-1
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 182 passed |
-| Native tests | `npm run test:rust` | 23 passed |
-| Browser rendering check | `npm run check:ui` | 17/17 assertions passed against the production bundle |
+| Unit and integration tests | `npm test` | 191 passed |
+| Native tests | `npm run test:rust` | 25 passed |
+| Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
 | Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation). Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
 | Desktop release build | `npm run tauri:build` | passed; NSIS and MSI installers produced |
@@ -275,6 +282,8 @@ The boot check is what confirms the CSP, the bundled scripts, the platform layer
 - Session restore reads file contents lazily: only the active tab is loaded at start, others load when selected. A moved or deleted file is marked missing rather than recreated.
 - The 200 KB performance target is missed (~491 ms of pipeline time, see above). The 5 MB case is not interactive by design; the preview is opt-in.
 - `npm audit` reports three low-severity advisories with no upstream fix published: KaTeX prototype pollution that can bypass trust restrictions, and the `remark-math` / `micromark-extension-math` chain that depends on it. KaTeX renders with `trust: false` and the application never passes document values into its options, which limits exposure; upgrade when fixed releases exist.
+- External changes are detected when the window regains focus, not by a live filesystem watcher, so a change made while the window stays focused is noticed only after switching away and back.
+- Replace edits the Markdown source and is disabled in Read Mode; it does not rewrite rendered DOM.
 - Toggle items in the View menu do not show a check mark; the toolbar's pressed state reflects the same setting.
 - No auto-update or code signing. The installer carries publisher metadata, but Windows will show an unknown-publisher warning until a certificate is configured.
 

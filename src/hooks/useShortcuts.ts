@@ -6,6 +6,7 @@ export type ShortcutName =
   | 'mod+2'
   | 'mod+3'
   | 'mod+f'
+  | 'mod+h'
   | 'mod+s'
   | 'mod+shift+s'
   | 'mod+o'
@@ -29,6 +30,7 @@ function shortcutFor(event: KeyboardEvent): ShortcutName | null {
   if (key === '2') return 'mod+2';
   if (key === '3') return 'mod+3';
   if (key === 'f') return 'mod+f';
+  if (key === 'h') return 'mod+h';
   if (key === 'o') return 'mod+o';
   if (key === 'w') return 'mod+w';
   if (key === 's') return event.shiftKey ? 'mod+shift+s' : 'mod+s';

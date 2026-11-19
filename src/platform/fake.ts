@@ -30,12 +30,17 @@ export interface FakePlatform extends Platform {
   dragDrop(paths: string[]): void;
   requestClose(): void;
   emitMenu(commandId: string): void;
+  /** Simulates another program rewriting a file: content changes and mtime bumps. */
+  writeExternally(path: string, content: string): void;
   closeRequests: number;
   assetOriginValue: string | null;
 }
 
 export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatform {
   const files = new Map<string, string>(Object.entries(options.files ?? {}));
+  const mtimes = new Map<string, number>();
+  let clock = 1;
+  for (const path of files.keys()) mtimes.set(path, clock++);
   const settingsWrites: string[] = [];
   const copied: string[] = [];
   const openedUrls: string[] = [];
@@ -79,6 +84,12 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
     async writeFile(path, text, bom) {
       if (options.writeFileError) throw new Error(options.writeFileError);
       files.set(path, `${bom ? '\uFEFF' : ''}${text}`);
+      mtimes.set(path, clock++);
+    },
+
+    async modifiedTime(path) {
+      if (!files.has(path)) return null;
+      return mtimes.get(path) ?? 0;
     },
 
     async fetchRemote(url) {
@@ -170,6 +181,11 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
 
     emitMenu(commandId) {
       for (const handler of menuHandlers) handler(commandId);
+    },
+
+    writeExternally(path, content) {
+      files.set(path, content);
+      mtimes.set(path, clock++);
     },
 
     closeRequests: 0,

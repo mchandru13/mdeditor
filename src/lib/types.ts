@@ -25,6 +25,8 @@ export interface DocState {
   error?: string;
   encoding: EncodingInfo;
   scroll: { editor: number; preview: number };
+  /** Disk mtime (ms) observed at load/save, used to detect external edits. */
+  diskModifiedAt: number | null;
 }
 
 export type WorkspaceMode = 'read' | 'edit' | 'split';

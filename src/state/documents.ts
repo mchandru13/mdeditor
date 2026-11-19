@@ -15,6 +15,7 @@ export interface CreateDocumentInput {
   source?: string;
   savedSource?: string | null;
   encoding?: EncodingInfo;
+  diskModifiedAt?: number | null;
 }
 
 let counter = 0;
@@ -35,6 +36,7 @@ export function createDocument(input: CreateDocumentInput): DocState {
     status: 'clean',
     encoding: input.encoding ?? { bom: false, eol: '\n' },
     scroll: { editor: 0, preview: 0 },
+    diskModifiedAt: input.diskModifiedAt ?? null,
   };
 }
 
@@ -55,9 +57,18 @@ export type DocumentsAction =
       origin?: DocOrigin;
       title?: string;
       encoding?: EncodingInfo;
+      diskModifiedAt?: number | null;
     }
   | { type: 'status'; id: DocId; status: DocStatus; error?: string }
-  | { type: 'reload'; id: DocId; source: string; savedSource: string; encoding?: EncodingInfo }
+  | {
+      type: 'reload';
+      id: DocId;
+      source: string;
+      savedSource: string;
+      encoding?: EncodingInfo;
+      diskModifiedAt?: number | null;
+    }
+  | { type: 'touch'; id: DocId; diskModifiedAt: number }
   | { type: 'scroll'; id: DocId; editor?: number; preview?: number };
 
 export function emptyDocumentsState(): DocumentsState {
@@ -126,6 +137,7 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         origin: action.origin ?? doc.origin,
         title: action.title ?? doc.title,
         encoding: action.encoding ?? doc.encoding,
+        diskModifiedAt: action.diskModifiedAt ?? doc.diskModifiedAt,
         status: 'clean',
         error: undefined,
       }));
@@ -143,8 +155,15 @@ export function documentsReducer(state: DocumentsState, action: DocumentsAction)
         source: action.source,
         savedSource: action.savedSource,
         encoding: action.encoding ?? doc.encoding,
+        diskModifiedAt: action.diskModifiedAt ?? doc.diskModifiedAt,
         status: 'clean',
         error: undefined,
+      }));
+
+    case 'touch':
+      return replaceDoc(state, action.id, (doc) => ({
+        ...doc,
+        diskModifiedAt: action.diskModifiedAt,
       }));
 
     case 'scroll':

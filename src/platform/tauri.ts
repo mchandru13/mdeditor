@@ -51,6 +51,14 @@ export function createTauriPlatform(): Platform {
       await invoke('write_document', { path, text, bom });
     },
 
+    async modifiedTime(path) {
+      try {
+        return await invoke<number>('modified_time', { path });
+      } catch {
+        return null;
+      }
+    },
+
     async fetchRemote(url) {
       return invoke<{ text: string; finalUrl: string }>('fetch_remote', { url });
     },
