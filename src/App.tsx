@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 
 import { DocumentTabs } from './components/DocumentTabs/DocumentTabs';
 import { UrlDialog } from './components/Dialogs/UrlDialog';
+import { InfoDialog, type InfoDialogKind } from './components/Dialogs/InfoDialog';
 import { SplitDivider } from './components/Divider/SplitDivider';
 import { Editor, type EditorHandle } from './components/Editor/EditorLazy';
 import { SearchBar } from './components/SearchBar/SearchBar';
@@ -81,6 +82,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const [activeMatch, setActiveMatch] = useState(0);
 
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+  const [infoDialog, setInfoDialog] = useState<InfoDialogKind | null>(null);
   const [urlBusy, setUrlBusy] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -247,8 +249,17 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     [platform],
   );
 
-  /* ------------------------------------------------------------- persistence */
+  /** Shared by the window close button, the Exit menu item and OS shutdown. */
+  const attemptClose = useCallback(async () => {
+    const dirty = stateRef.current.docs.filter(isDirty);
+    if (dirty.length > 0) {
+      const proceed = await platform.confirmDiscard(dirty.map((entry) => entry.title));
+      if (!proceed) return;
+    }
+    await platform.closeWindow();
+  }, [platform]);
 
+  /* ------------------------------------------------------------- persistence */
   useEffect(() => {
     let cancelled = false;
 
@@ -354,17 +365,11 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
   useEffect(() => {
     const dispose = platform.onCloseRequested(() => {
-      void (async () => {
-        const dirty = stateRef.current.docs.filter(isDirty);
-        if (dirty.length > 0) {
-          const proceed = await platform.confirmDiscard(dirty.map((entry) => entry.title));
-          if (!proceed) return;
-        }
-        await platform.closeWindow();
-      })();
+      void attemptClose();
     });
     return dispose;
-  }, [platform]);
+  }, [platform, attemptClose]);
+
 
   useEffect(() => {
     void (async () => {
@@ -635,6 +640,90 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     }
   }, [ensureOutput, platform, resolvedTheme]);
 
+  /* -------------------------------------------------------------------- menu */
+
+  useEffect(() => {
+    const dispose = platform.onMenuCommand((commandId) => {
+      const current = activeDocument(stateRef.current);
+
+      switch (commandId) {
+        case 'file.open':
+          void openFromDialog();
+          break;
+        case 'file.openUrl':
+          setUrlDialogOpen(true);
+          break;
+        case 'file.clipboard':
+          void newFromClipboard();
+          break;
+        case 'file.save':
+          if (current) void saveDocument(current);
+          break;
+        case 'file.saveAs':
+          if (current) void saveDocument(current, true);
+          break;
+        case 'file.exportHtml':
+          void exportHtml();
+          break;
+        case 'file.print':
+          platform.print();
+          break;
+        case 'file.exit':
+          void attemptClose();
+          break;
+        case 'edit.undo':
+          editorRef.current?.undo();
+          break;
+        case 'edit.redo':
+          editorRef.current?.redo();
+          break;
+        case 'edit.find':
+          setSearchOpen(true);
+          break;
+        case 'view.read':
+          setMode('read');
+          break;
+        case 'view.edit':
+          setMode('edit');
+          break;
+        case 'view.split':
+          setMode('split');
+          break;
+        case 'view.toc':
+          setTocVisible((value) => !value);
+          break;
+        case 'view.syncScroll':
+          setSyncScroll((value) => !value);
+          break;
+        case 'view.theme.light':
+          setTheme('light');
+          break;
+        case 'view.theme.dark':
+          setTheme('dark');
+          break;
+        case 'view.theme.system':
+          setTheme('system');
+          break;
+        case 'help.shortcuts':
+          setInfoDialog('shortcuts');
+          break;
+        case 'help.about':
+          setInfoDialog('about');
+          break;
+        default:
+          break;
+      }
+    });
+
+    return dispose;
+  }, [
+    attemptClose,
+    exportHtml,
+    newFromClipboard,
+    openFromDialog,
+    platform,
+    saveDocument,
+  ]);
   /* -------------------------------------------------------------------- view */
 
   const emptyState = (
@@ -806,6 +895,10 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
             error={urlError}
             busy={urlBusy}
           />
+        ) : null}
+
+        {infoDialog ? (
+          <InfoDialog kind={infoDialog} onClose={() => setInfoDialog(null)} />
         ) : null}
       </div>
     </PlatformProvider>

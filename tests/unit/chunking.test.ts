@@ -101,19 +101,24 @@ describe('chunked parsing', () => {
     expect(withChunking).toBe(withoutChunking);
   });
 
-  it('does not split lists or blockquotes across chunk boundaries', () => {
-    const source = Array.from(
-      { length: 1800 },
-      (_, index) => `- item ${index} of a list\n\n- second ${index}\n\n> quote ${index}\n\n`,
-    ).join('');
-    expect(source.length).toBeGreaterThan(CHUNK_THRESHOLD);
+  it(
+    'does not split lists or blockquotes across chunk boundaries',
+    () => {
+      const source = Array.from(
+        { length: 1800 },
+        (_, index) => `- item ${index} of a list\n\n- second ${index}\n\n> quote ${index}\n\n`,
+      ).join('');
+      expect(source.length).toBeGreaterThan(CHUNK_THRESHOLD);
 
-    const chunked = renderMarkdown(source, OPTIONS);
-    const plain = renderMarkdown(source, { ...OPTIONS, chunking: false });
+      const chunked = renderMarkdown(source, OPTIONS);
+      const plain = renderMarkdown(source, { ...OPTIONS, chunking: false });
 
-    expect(toHtml(chunked.hast)).toBe(toHtml(plain.hast));
-    expect(chunked.headings.length).toBe(plain.headings.length);
-  });
+      expect(toHtml(chunked.hast)).toBe(toHtml(plain.hast));
+      expect(chunked.headings.length).toBe(plain.headings.length);
+    },
+    // The unchunked parse deliberately takes the slow path this test contrasts.
+    30000,
+  );
 
   it('resolves reference links whose definition is in a later chunk', () => {
     const filler = Array.from({ length: 1200 }, (_, index) => paragraph(index)).join('');

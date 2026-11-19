@@ -29,6 +29,8 @@ export interface FakePlatform extends Platform {
   openedUrls: string[];
   dragDrop(paths: string[]): void;
   requestClose(): void;
+  emitMenu(commandId: string): void;
+  closeRequests: number;
   assetOriginValue: string | null;
 }
 
@@ -39,6 +41,7 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
   const openedUrls: string[] = [];
   const dragHandlers = new Set<(paths: string[]) => void>();
   const closeHandlers = new Set<() => void>();
+  const menuHandlers = new Set<(commandId: string) => void>();
 
   const platform: FakePlatform = {
     kind: 'fake',
@@ -132,6 +135,11 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
       return () => closeHandlers.delete(handler);
     },
 
+    onMenuCommand(handler) {
+      menuHandlers.add(handler);
+      return () => menuHandlers.delete(handler);
+    },
+
     async confirmDiscard() {
       return options.confirmResult ?? true;
     },
@@ -145,7 +153,7 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
     },
 
     async closeWindow() {
-      return undefined;
+      platform.closeRequests += 1;
     },
 
     print() {
@@ -159,6 +167,12 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
     requestClose() {
       for (const handler of closeHandlers) handler();
     },
+
+    emitMenu(commandId) {
+      for (const handler of menuHandlers) handler(commandId);
+    },
+
+    closeRequests: 0,
   };
 
   return platform;

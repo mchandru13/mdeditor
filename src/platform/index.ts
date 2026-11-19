@@ -22,6 +22,8 @@ export interface Platform {
   saveSettings(json: string): Promise<void>;
   onDragDrop(handler: (paths: string[]) => void): () => void;
   onCloseRequested(handler: () => void): () => void;
+  /** Native menu commands, identified by stable ids such as `file.save`. */
+  onMenuCommand(handler: (commandId: string) => void): () => void;
   confirmDiscard(names: string[]): Promise<boolean>;
   /** Generic confirmation used for non-destructive limits such as tab count. */
   confirmAction(message: string): Promise<boolean>;

@@ -9,7 +9,7 @@ import {
   keymap,
   lineNumbers,
 } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
@@ -25,6 +25,8 @@ export interface EditorHandle {
   /** 1-based line currently at the top of the viewport. */
   lineAtScrollTop(top: number): number;
   scrollToLine(line: number): void;
+  undo(): void;
+  redo(): void;
 }
 
 export interface EditorProps {
@@ -193,6 +195,18 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       const clamped = Math.max(1, Math.min(line, total));
       const block = view.lineBlockAt(view.state.doc.line(clamped).from);
       view.scrollDOM.scrollTop = Math.max(0, block.top);
+    },
+    undo() {
+      const view = viewRef.current;
+      if (!view) return;
+      undo(view);
+      view.focus();
+    },
+    redo() {
+      const view = viewRef.current;
+      if (!view) return;
+      redo(view);
+      view.focus();
     },
   }));
 

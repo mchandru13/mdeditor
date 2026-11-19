@@ -25,6 +25,8 @@ vi.mock('../../src/components/Editor/Editor', () => {
       restoreScroll: () => undefined,
       lineAtScrollTop: () => 1,
       scrollToLine: () => undefined,
+      undo: () => undefined,
+      redo: () => undefined,
     }));
 
     return (
@@ -47,8 +49,11 @@ function renderApp(options: Parameters<typeof createFakePlatform>[0] = {}, mode:
   return { platform, ...view };
 }
 
-async function openFromClipboard(text = '# Pasted\n\nalpha alpha\n') {
-  const result = renderApp({ clipboard: text });
+async function openFromClipboard(
+  text = '# Pasted\n\nalpha alpha\n',
+  options: Parameters<typeof createFakePlatform>[0] = {},
+) {
+  const result = renderApp({ clipboard: text, ...options });
   fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
   await screen.findByRole('tab', { name: /Pasted document/ });
   return result;
@@ -319,6 +324,112 @@ describe('remote documents', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Open' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('HTTP 404');
+  });
+});
+
+describe('menu commands', () => {
+  it('switches modes from View commands', async () => {
+    const { platform } = await openFromClipboard('text');
+
+    await act(async () => {
+      platform.emitMenu('view.read');
+    });
+    const radios = await screen.findAllByRole('radio');
+    expect(radios.find((radio) => radio.textContent === 'Read')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    await act(async () => {
+      platform.emitMenu('view.split');
+    });
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Markdown source editor')).not.toBeNull();
+    });
+  });
+
+  it('toggles the contents sidebar from the View menu', async () => {
+    const { platform } = await openFromClipboard('# One\n\n## Two\n');
+
+    await act(async () => {
+      platform.emitMenu('view.read');
+    });
+    await screen.findByRole('navigation', { name: 'Table of contents' });
+
+    await act(async () => {
+      platform.emitMenu('view.toc');
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('navigation', { name: 'Table of contents' })).toBeNull();
+    });
+  });
+
+  it('saves through the File menu', async () => {
+    const { platform } = renderApp({ clipboard: '# saved from menu\n', savePath: 'C:\\out\\menu.md' });
+    fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
+    await screen.findByRole('tab', { name: /Pasted document/ });
+
+    await act(async () => {
+      platform.emitMenu('file.save');
+    });
+
+    await waitFor(() => {
+      expect(platform.files.get('C:\\out\\menu.md')).toContain('# saved from menu');
+    });
+  });
+
+  it('opens the search bar from Edit > Find', async () => {
+    const { platform } = await openFromClipboard('needle');
+
+    await act(async () => {
+      platform.emitMenu('edit.find');
+    });
+    expect(await screen.findByLabelText('Search text')).toBeInTheDocument();
+  });
+
+  it('shows the shortcut reference and About box from Help', async () => {
+    const { platform } = renderApp();
+
+    await act(async () => {
+      platform.emitMenu('help.shortcuts');
+    });
+    const shortcuts = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
+    expect(shortcuts).toHaveTextContent('Ctrl+S');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    await act(async () => {
+      platform.emitMenu('help.about');
+    });
+    expect(await screen.findByRole('dialog', { name: 'About Markdown Editor' })).toBeInTheDocument();
+  });
+
+  it('asks before exiting with unsaved changes', async () => {
+    const { platform } = renderApp({ clipboard: 'text', confirmResult: false });
+    fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
+    await screen.findByRole('tab', { name: /Pasted document/ });
+
+    fireEvent.change(await screen.findByLabelText('Markdown source editor'), {
+      target: { value: 'changed' },
+    });
+
+    await act(async () => {
+      platform.emitMenu('file.exit');
+    });
+
+    // confirmResult is false, so closeWindow must not have been called; the tab stays.
+    expect(platform.closeRequests).toBe(0);
+    expect(screen.queryByRole('tab')).not.toBeNull();
+  });
+
+  it('ignores unknown command ids', async () => {
+    const { platform } = renderApp({ clipboard: 'text' });
+    fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
+
+    await act(async () => {
+      platform.emitMenu('does.not.exist');
+    });
+    expect(screen.queryByRole('tab')).not.toBeNull();
   });
 });
 

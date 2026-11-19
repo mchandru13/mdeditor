@@ -61,8 +61,22 @@ Icons live in `src-tauri/icons/` and are generated from `app-icon.png` with `npx
 | `npm run bench` | Markdown pipeline benchmark (writes `bench/results.json`) |
 | `npm run check:ui` | Playwright smoke test against the production bundle (needs `npm run preview`) |
 | `npm run check:app` | Playwright + CDP smoke test against the packaged desktop app |
+| `npm run check:menu` | Windows UI Automation check of the native menu bar |
 
 ## Using the application
+
+### Menu bar
+
+A native Windows menu bar exposes every action and its accelerator:
+
+| Menu | Items |
+|---|---|
+| File | Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, Print… (Ctrl+P), Exit |
+| Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F) |
+| View | Read Mode (Ctrl+1), Edit Mode (Ctrl+2), Split Mode (Ctrl+3), Toggle Contents, Toggle Sync Scroll, Theme ▸ Light / Dark / System |
+| Help | Keyboard Shortcuts, About Markdown Editor |
+
+The menu, the toolbar and the keyboard shortcuts all call the same handlers, so behaviour cannot drift between them. Cut/Copy/Paste/Select All are predefined OS items and therefore apply to whatever currently has focus. Toggle items do not show a check mark; the toolbar's pressed state and the View menu act on the same underlying setting.
 
 ### Opening documents
 
@@ -242,6 +256,7 @@ Everything below was executed on the reference machine (11th Gen Intel Core i5-1
 | Native tests | `npm run test:rust` | 23 passed |
 | Browser rendering check | `npm run check:ui` | 17/17 assertions passed against the production bundle |
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
+| Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation). Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
 | Desktop release build | `npm run tauri:build` | passed; NSIS and MSI installers produced |
 | Packaged app boot | run `src-tauri/target/release/mdeditor.exe` | process stayed alive, React mounted, and `%APPDATA%\com.rea.mdeditor\settings.json` was written through IPC with the expected defaults |
 | Benchmark | `npm run bench` | see Performance: 200 KB in ~491 ms of pipeline time, 5 MB in ~24 s |
@@ -258,6 +273,7 @@ The boot check is what confirms the CSP, the bundled scripts, the platform layer
 - Session restore reads file contents lazily: only the active tab is loaded at start, others load when selected. A moved or deleted file is marked missing rather than recreated.
 - The 200 KB performance target is missed (~491 ms of pipeline time, see above). The 5 MB case is not interactive by design; the preview is opt-in.
 - `npm audit` reports three low-severity advisories with no upstream fix published: KaTeX prototype pollution that can bypass trust restrictions, and the `remark-math` / `micromark-extension-math` chain that depends on it. KaTeX renders with `trust: false` and the application never passes document values into its options, which limits exposure; upgrade when fixed releases exist.
+- Toggle items in the View menu do not show a check mark; the toolbar's pressed state reflects the same setting.
 - No auto-update or code signing. The installer carries publisher metadata, but Windows will show an unknown-publisher warning until a certificate is configured.
 
 ## Troubleshooting

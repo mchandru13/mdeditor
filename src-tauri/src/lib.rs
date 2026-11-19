@@ -1,3 +1,4 @@
+mod menu;
 mod paths;
 mod remote;
 mod settings;
@@ -112,6 +113,23 @@ pub fn run() {
             save_settings,
             close_window
         ])
+        .setup(|app| {
+            // Windows are created from config before this hook runs, so the menu
+            // must be attached to the main window explicitly; `set_menu` alone
+            // only applies to windows created later.
+            let menu = menu::build(app.handle())?;
+            if let Some(window) = app.get_webview_window("main") {
+                window.set_menu(menu)?;
+            } else {
+                app.set_menu(menu)?;
+            }
+            Ok(())
+        })
+        .on_menu_event(|app, event| {
+            // The frontend performs the action so menu, toolbar and shortcuts
+            // share one implementation.
+            let _ = app.emit(menu::MENU_EVENT, event.id().as_ref());
+        })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() == "main" {

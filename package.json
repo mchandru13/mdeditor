@@ -17,7 +17,8 @@
     "tauri:build": "tauri build",
     "bench": "tsx scripts/bench.ts",
     "check:ui": "node scripts/browser-check.mjs",
-    "check:app": "node scripts/app-check.mjs"
+    "check:app": "node scripts/app-check.mjs",
+    "check:menu": "powershell -ExecutionPolicy Bypass -File scripts/menu-check.ps1"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",
