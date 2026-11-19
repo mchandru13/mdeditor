@@ -151,7 +151,6 @@ pub fn write_document(path: &Path, text: &str, bom: bool) -> Result<(), FsError>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write as _;
 
     fn temp_file(name: &str, contents: &[u8]) -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().expect("temp dir");

@@ -86,9 +86,21 @@ A file can be opened directly from the command line, which also makes the packag
 ```powershell
 mdeditor.exe --file "C:\docs\notes.md"
 mdeditor.exe --url "https://example.com/README.md"
+mdeditor.exe "C:\docs\notes.md"   # what the file association passes
 ```
 
-`--file` accepts `.md`/`.markdown`; `--url` goes through the same HTTPS-only fetch path as the dialog.
+`--file` accepts `.md`/`.markdown`; `--url` goes through the same HTTPS-only fetch path as the dialog. A bare path (no flag) is also accepted, which is how Windows launches the application when a `.md` file is opened from Explorer or "Open with".
+
+### File association
+
+The installer registers the application as a handler for `.md` and `.markdown`:
+
+- `HKCU\Software\Classes\.md` → `Markdown Document`
+- `HKCU\Software\Classes\Markdown Document\shell\open\command` → `"...\mdeditor.exe" "%1"`
+
+Double-clicking a Markdown file launches the app with that file. If an instance is already running, a second launch is intercepted by the single-instance plugin and the path is forwarded to the running window as a new tab, which is then focused — no second window, no duplicate process.
+
+The installer adds the entry under `OpenWithProgids`; Windows may still ask which application to use the first time, because modern Windows no longer lets an installer silently take over an existing association (`.md` is currently held by another editor on most machines). Choose "Markdown Editor" and tick "Always use this app" to make it stick.
 
 - **New** (Ctrl+N) creates an empty untitled document, numbered (`Untitled 1`, `Untitled 2`, …).
 - **Open** (Ctrl+O) uses the native file picker and accepts `.md` and `.markdown`.
@@ -215,8 +227,8 @@ Lighthouse cannot interact with the application, so this measures the **empty wo
 ## Testing
 
 ```bash
-npm test        # 193 tests (Vitest + React Testing Library, jsdom)
-npm run test:rust  # 25 tests (cargo test)
+npm test        # 195 tests (Vitest + React Testing Library, jsdom)
+npm run test:rust  # 29 tests (cargo test)
 ```
 
 Coverage:
@@ -274,8 +286,9 @@ Everything below was executed on the reference machine (11th Gen Intel Core i5-1
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 193 passed |
-| Native tests | `npm run test:rust` | 25 passed |
+| Unit and integration tests | `npm test` | 195 passed |
+| Native tests | `npm run test:rust` | 29 passed |
+| File association | double-click a `.md` in Explorer | launches the app with that file; second file forwards to the running window (verified: 1 process, tab added) |
 | Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
 | End-to-end session | `npm run check:e2e` | 12/12: open via `--file`, render, edit, replace, save to disk, external reload, copy HTML, mode switch; four consecutive clean runs |

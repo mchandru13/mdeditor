@@ -379,6 +379,13 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   }, [platform, openPath]);
 
   useEffect(() => {
+    const dispose = platform.onOpenFile((path) => {
+      void openPath(path);
+    });
+    return dispose;
+  }, [platform, openPath]);
+
+  useEffect(() => {
     const dispose = platform.onCloseRequested(() => {
       void attemptClose();
     });

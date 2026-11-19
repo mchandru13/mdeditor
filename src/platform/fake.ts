@@ -31,6 +31,8 @@ export interface FakePlatform extends Platform {
   dragDrop(paths: string[]): void;
   requestClose(): void;
   emitMenu(commandId: string): void;
+  /** Simulates a second launch passing a file to the running instance. */
+  openFileExternally(path: string): void;
   /** Simulates another program rewriting a file: content changes and mtime bumps. */
   writeExternally(path: string, content: string): void;
   closeRequests: number;
@@ -48,6 +50,7 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
   const dragHandlers = new Set<(paths: string[]) => void>();
   const closeHandlers = new Set<() => void>();
   const menuHandlers = new Set<(commandId: string) => void>();
+  const openFileHandlers = new Set<(path: string) => void>();
 
   const platform: FakePlatform = {
     kind: 'fake',
@@ -152,6 +155,11 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
       return () => menuHandlers.delete(handler);
     },
 
+    onOpenFile(handler) {
+      openFileHandlers.add(handler);
+      return () => openFileHandlers.delete(handler);
+    },
+
     async confirmDiscard() {
       return options.confirmResult ?? true;
     },
@@ -191,6 +199,10 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
     writeExternally(path, content) {
       files.set(path, content);
       mtimes.set(path, clock++);
+    },
+
+    openFileExternally(path) {
+      for (const handler of openFileHandlers) handler(path);
     },
 
     closeRequests: 0,

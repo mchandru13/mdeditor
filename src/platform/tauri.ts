@@ -124,6 +124,16 @@ export function createTauriPlatform(): Platform {
       return () => unlisten?.();
     },
 
+    onOpenFile(handler) {
+      let unlisten: (() => void) | undefined;
+      void listen<string>('mdeditor://open-file', (event) => handler(event.payload)).then(
+        (dispose) => {
+          unlisten = dispose;
+        },
+      );
+      return () => unlisten?.();
+    },
+
     async confirmDiscard(names) {
       const label = names.length === 1 ? `"${fileTitle(names[0] ?? '')}"` : `${names.length} documents`;
       return ask(`Discard unsaved changes in ${label}?`, {

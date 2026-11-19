@@ -680,6 +680,32 @@ describe('command line arguments', () => {
   });
 });
 
+describe('file association', () => {
+  it('opens a file handed over by a second launch', async () => {
+    const { platform } = renderApp({ files: { 'C:\\docs\\drop.md': '# Dropped\n' } });
+
+    await act(async () => {
+      platform.openFileExternally('C:\\docs\\drop.md');
+    });
+
+    expect(await screen.findByRole('tab', { name: /drop.md/ })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Markdown source editor')).toHaveValue('# Dropped\n');
+  });
+
+  it('rejects a non-Markdown file handed over by a second launch', async () => {
+    const { platform } = renderApp({ files: { 'C:\\docs\\a.txt': 'x' } });
+
+    await act(async () => {
+      platform.openFileExternally('C:\\docs\\a.txt');
+    });
+
+    expect(
+      await screen.findByText(/Only \.md and \.markdown files are supported/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('tab')).toBeNull();
+  });
+});
+
 describe('preferences', () => {
   it('persists the workspace mode and theme', async () => {
     const { platform } = renderApp({}, 'split');

@@ -5,8 +5,10 @@ application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
 
-Current state: 193 TypeScript tests, 25 Rust tests, and three packaged-app checks
-(`check:ui` 18/18, `check:app` 10/10, `check:e2e` 12/12) all pass.
+Current state: 195 TypeScript tests, 29 Rust tests, and three packaged-app checks
+(`check:ui` 18/18, `check:app` 10/10, `check:e2e` 12/12) all pass. File
+associations for `.md` and `.markdown` are registered by the installer and
+verified by double-click and second-instance forwarding.
 
 ---
 
@@ -93,7 +95,7 @@ checks for full coverage.
 
 | Gap | Status |
 |---|---|
-| Native file picker | Not automated. The CLI `--file` path and drag-and-drop are covered; the OS dialog is not. |
+| Native file picker | Not automated. The CLI path, file association and drag-and-drop are covered; the OS dialog is not. |
 | Print dialog output | Not automated. The stylesheet is unit-tested indirectly; the dialog result is unverified. |
 | Export "Save as" dialog | Not automated. `buildStandaloneHtml` is covered by tests; the final dialog is not. |
 | Drag-and-drop from Explorer | Covered at the platform-interface level (fake platform) but not from a real Explorer drag. |

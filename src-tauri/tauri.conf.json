@@ -41,6 +41,15 @@
     "category": "Productivity",
     "shortDescription": "Local-first Markdown viewer and editor",
     "longDescription": "A lightweight Markdown viewer and editor with tabbed documents, Read/Edit/Split modes, GitHub-flavoured Markdown, KaTeX math and Mermaid diagrams.",
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown"],
+        "name": "Markdown Document",
+        "description": "Markdown document",
+        "mimeType": "text/markdown",
+        "role": "Editor"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

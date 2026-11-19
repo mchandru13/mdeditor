@@ -7,10 +7,16 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, Emitter, Manager, State};
 
-/// Result of parsing `--url` and `--file` at startup.
+/// Result of parsing command-line document arguments at startup.
 struct StartupArgs {
     url: Option<String>,
     file: Option<String>,
+}
+
+/// Returns the first positional argument that looks like a Markdown file, which
+/// is what Windows passes when a file is opened through a file association.
+fn positional_markdown_arg() -> Option<String> {
+    file_from_args(std::env::args().skip(1))
 }
 
 fn parse_arg(flag: &str) -> Option<String> {
@@ -24,6 +30,20 @@ fn parse_arg(flag: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// Extracts a Markdown path from an arbitrary argument list. Used both for this
+/// process and for a second instance launched by double-clicking a file.
+///
+/// URLs are excluded so that `--url https://example.com/a.md` is not mistaken for
+/// a local path.
+fn file_from_args<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    args.into_iter()
+        .filter(|arg| !arg.starts_with('-') && !arg.contains("://"))
+        .find(|arg| {
+            let lower = arg.to_ascii_lowercase();
+            lower.ends_with(".md") || lower.ends_with(".markdown")
+        })
 }
 
 #[tauri::command]
@@ -105,14 +125,64 @@ fn close_window(window: tauri::Window) -> Result<(), String> {
     window.destroy().map_err(|err| err.to_string())
 }
 
+#[cfg(test)]
+mod argument_tests {
+    use super::file_from_args;
+
+    fn args(items: &[&str]) -> Vec<String> {
+        items.iter().map(|item| item.to_string()).collect()
+    }
+
+    #[test]
+    fn finds_a_bare_markdown_path() {
+        assert_eq!(
+            file_from_args(args(&[r"C:\docs\notes.md"])),
+            Some(r"C:\docs\notes.md".to_string())
+        );
+    }
+
+    #[test]
+    fn finds_markdown_among_the_flags() {
+        assert_eq!(
+            file_from_args(args(&["--flag", r"C:\a\b.MARKDOWN"])),
+            Some(r"C:\a\b.MARKDOWN".to_string())
+        );
+    }
+
+    #[test]
+    fn ignores_non_markdown_paths_and_flags() {
+        assert_eq!(file_from_args(args(&[r"C:\a\notes.txt", "--url", "https://e.test"])), None);
+        assert_eq!(file_from_args(args(&[])), None);
+    }
+
+    #[test]
+    fn does_not_treat_a_url_as_a_file() {
+        assert_eq!(
+            file_from_args(args(&["--url", "https://example.com/a.md"])),
+            None
+        );
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let startup = StartupArgs {
         url: parse_arg("--url"),
-        file: parse_arg("--file"),
+        file: parse_arg("--file").or_else(positional_markdown_arg),
     };
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // A second launch (for example double-clicking a .md file in Explorer)
+            // hands its arguments here; forward the document to the running window.
+            if let Some(path) = file_from_args(argv.into_iter().skip(1)) {
+                let _ = app.emit("mdeditor://open-file", path);
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())

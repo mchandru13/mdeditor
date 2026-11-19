@@ -26,6 +26,8 @@ export interface Platform {
   onCloseRequested(handler: () => void): () => void;
   /** Native menu commands, identified by stable ids such as `file.save`. */
   onMenuCommand(handler: (commandId: string) => void): () => void;
+  /** A second launch asked this instance to open a file (file association). */
+  onOpenFile(handler: (path: string) => void): () => void;
   confirmDiscard(names: string[]): Promise<boolean>;
   /** Generic confirmation used for non-destructive limits such as tab count. */
   confirmAction(message: string): Promise<boolean>;
