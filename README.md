@@ -59,6 +59,8 @@ Icons live in `src-tauri/icons/` and are generated from `app-icon.png` with `npx
 | `npm run tauri:dev` | Desktop app with hot reload |
 | `npm run tauri:build` | Release build and installers |
 | `npm run bench` | Markdown pipeline benchmark (writes `bench/results.json`) |
+| `npm run check:ui` | Playwright smoke test against the production bundle (needs `npm run preview`) |
+| `npm run check:app` | Playwright + CDP smoke test against the packaged desktop app |
 
 ## Using the application
 
@@ -126,7 +128,7 @@ src-tauri/src/   lib.rs (commands, window lifecycle), paths.rs, remote.rs, setti
 
 Key decisions:
 
-- **Markdown runs in a Web Worker.** `useDocumentRender` debounces the source (150 ms in Split Mode, 500 ms above 1 MB) and drops stale results by request id, so a slow render can never overwrite a newer one or leak into another tab.
+- **Markdown runs in a Web Worker.** `useDocumentRender` debounces the source (150 ms in Split Mode, 500 ms above 1 MB) and drops stale results by request id, so a slow render can never overwrite a newer one or leak into another tab. If the worker cannot start or crashes, rendering degrades to the main thread instead of leaving the preview blank; `tests/unit/renderClient.test.ts` covers that path.
 - **Two-stage rendering.** The pipeline emits HAST with placeholders for math and diagrams. Sanitization runs before any KaTeX or Mermaid rendering, and neither library ever receives document-supplied HTML.
 - **Rust owns durability.** `settings.json` is written atomically in the app data directory, corrupted files are backed up as `settings.corrupt-<timestamp>.json`, and invalid or future versions are ignored rather than overwritten.
 - **Encoding fidelity.** Files are read as UTF-8; a BOM is detected and restored on save, and the dominant newline style is preserved per document. Round-trip behaviour is covered by Rust and TypeScript tests.
@@ -182,7 +184,25 @@ Coverage:
 - **State:** per-tab independence, dirty derivation, close-neighbour selection, restore and persistence guards (corrupt settings, unknown versions, oversized recovery data, quota failures).
 - **Integration:** mode switching and layout, unsaved edits surviving every transition, tab independence, save and failed save, search navigation, remote URL validation and fetch errors, keyboard shortcuts, ARIA roles and tab focus movement.
 
-**Not covered by automation:** the native window, real file dialogs and drag-and-drop, WebView2 rendering, Mermaid/KaTeX visual output, and printing. These are verified manually against the packaged build. CodeMirror is replaced by a controlled textarea in the integration tests; the real editor is exercised only in the browser.
+**Still manual:** opening files through the native picker, dragging files in from Explorer, the print dialog output, and visual/design judgement. Everything else listed above is automated, including rendering inside the packaged application.
+
+### Browser and packaged-app smoke tests
+
+Two Playwright scripts exercise the real UI in Edge (the same Chromium engine as WebView2):
+
+```bash
+npm run preview          # in one terminal
+npm run check:ui         # 17 assertions against http://localhost:4173
+```
+
+```bash
+npm run tauri:build      # then
+npm run check:app        # attaches to the packaged app over CDP and opens a remote document
+```
+
+`check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, the TOC, and zero page errors. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, opens a real HTTPS Markdown document through the Rust fetch command, and asserts the same rendering surface inside the actual desktop webview.
+
+`check:ui` needs Edge installed and a running preview server; `check:app` needs a release build and network access for the remote document.
 
 ### Manual smoke checklist (packaged build)
 
@@ -208,9 +228,11 @@ Everything below was executed on the reference machine (11th Gen Intel Core i5-1
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 149 passed |
+| Unit and integration tests | `npm test` | 155 passed |
 | Native tests | `npm run test:rust` | 23 passed |
-| Desktop release build | `npm run tauri:build` | passed; NSIS 10.15 MiB and MSI 10.77 MiB |
+| Browser rendering check | `npm run check:ui` | 17/17 assertions passed against the production bundle |
+| Packaged app rendering check | `npm run check:app` | 9/9 assertions passed inside WebView2 with a remote document |
+| Desktop release build | `npm run tauri:build` | passed; NSIS 10.2 MiB and MSI 10.8 MiB |
 | Packaged app boot | run `src-tauri/target/release/mdeditor.exe` | process stayed alive, React mounted, and `%APPDATA%\com.rea.mdeditor\settings.json` was written through IPC with the expected defaults |
 | Benchmark | `npm run bench` | see Performance: 200 KB in ~614 ms of pipeline time, 5 MB in ~30 s |
 

@@ -1,4 +1,9 @@
-/** In-memory platform used by tests and by `npm run dev` outside Tauri. */
+/**
+ * In-memory platform used by tests and by `npm run dev` outside Tauri.
+ *
+ * In a real browser the clipboard actions fall back to the async Clipboard API
+ * when the page has permission, so the browser build stays usable for UI work.
+ */
 
 import type { Platform } from './index';
 
@@ -86,10 +91,21 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
 
     async copyText(text) {
       copied.push(text);
+      if (options.clipboard === undefined && typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(text).catch(() => undefined);
+      }
     },
 
     async readClipboard() {
-      return options.clipboard ?? '';
+      if (options.clipboard !== undefined) return options.clipboard;
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        try {
+          return await navigator.clipboard.readText();
+        } catch {
+          return '';
+        }
+      }
+      return '';
     },
 
     async openExternal(url) {

@@ -15,7 +15,9 @@
     "typecheck": "tsc --noEmit",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "bench": "tsx scripts/bench.ts"
+    "bench": "tsx scripts/bench.ts",
+    "check:ui": "node scripts/browser-check.mjs",
+    "check:app": "node scripts/app-check.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",
@@ -58,6 +60,7 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^29.1.1",
+    "playwright-core": "^1.65.1",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.73.0",

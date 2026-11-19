@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { RenderOutput } from '../lib/markdownPipeline';
 import { createRenderer, type Renderer } from '../lib/renderClient';
@@ -79,6 +79,13 @@ export function useDocumentRender(
     [rendererRef],
   );
 
+  /** Recreated lazily so React's strict-mode double mount cannot leave a
+   * disposed renderer in place and silently skip rendering. */
+  const getRenderer = useCallback(() => {
+    if (rendererRef.current === null) rendererRef.current = createRenderer();
+    return rendererRef.current;
+  }, [rendererRef]);
+
   const large = (doc?.source.length ?? 0) > AUTO_PREVIEW_LIMIT;
   const requiresManualRender = large && manualDocId !== doc?.id;
   const isPreviewVisible = mode !== 'edit';
@@ -116,8 +123,8 @@ export function useDocumentRender(
       disableRichContent: doc.source.length > RICH_CONTENT_LIMIT,
     };
 
-    void rendererRef.current
-      ?.render(options, debouncedSource)
+    void getRenderer()
+      .render(options, debouncedSource)
       .then((output) => {
         if (cancelled || id !== seq.current) return;
         cache.current.set(doc.id, { source: debouncedSource, output });
@@ -138,7 +145,7 @@ export function useDocumentRender(
     return () => {
       cancelled = true;
     };
-  }, [doc, mode, shouldRender, debouncedSource, platform, rendererRef]);
+  }, [doc, mode, shouldRender, debouncedSource, platform, rendererRef, getRenderer]);
 
   // Leaving Edit Mode with a cached result must show it immediately.
   useEffect(() => {
