@@ -48,7 +48,7 @@ jobs:
           if ("${{ github.event_name }}" -eq "push" -and "v$version" -ne "${{ github.ref_name }}") {
             throw "Tag ${{ github.ref_name }} does not match version $version. Expected v$version."
           }
-          Write-Host "Version $version matches the tag."
+          Write-Host "Version $version is consistent across package.json, Cargo.toml and tauri.conf.json."
           "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Build application and installers

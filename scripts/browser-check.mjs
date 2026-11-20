@@ -115,6 +115,15 @@ await page.keyboard.press('Control+3');
 await page.waitForSelector('.markdown-body', { timeout: 8000 });
 await page.keyboard.press('Control+f');
 await page.locator('input[aria-label="Search text"]').fill('diagram');
+// Match counting is asynchronous: the status reads "No matches" until the first
+// result arrives, so poll for the count instead of reading a transient state.
+await page
+  .waitForFunction(
+    () => /\d+ of \d+/.test(document.querySelector('#search-status')?.textContent ?? ''),
+    undefined,
+    { timeout: 8000 },
+  )
+  .catch(() => undefined);
 const status = await page.locator('#search-status').innerText();
 check('search reports a match count', /\d+ of \d+/.test(status), status);
 
