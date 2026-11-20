@@ -32,5 +32,12 @@ export default defineConfig({
     include: ['tests/**/*.test.{ts,tsx}'],
     restoreMocks: true,
     css: true,
+    // Some pipeline tests parse 100 KB+ fixtures and take ~1.6 s alone. With 15
+    // jsdom environments running in parallel that comfortably exceeds Vitest's
+    // 5 s default on a loaded machine, which showed up as a failure in the full
+    // suite but never when the file ran alone. The limit is raised rather than
+    // the fixtures shrunk, because they exist to cross the 64 KB chunking
+    // threshold and a smaller document would stop testing chunking at all.
+    testTimeout: 30000,
   },
 });

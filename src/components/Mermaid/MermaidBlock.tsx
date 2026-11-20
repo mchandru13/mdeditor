@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { usePlatform } from '../../platform/context';
 import { isSafeSvg } from '../../lib/svgSafety';
@@ -90,14 +90,16 @@ export function MermaidBlock({ source, theme, disabled = false }: MermaidBlockPr
   }, [visible, source, theme, disabled, reactId]);
 
   // Mermaid `click` directives produce real anchors inside the SVG, which bypass
-  // the link handling used for Markdown links. Delegate here so those links open
-  // in the system browser; the Rust navigation guard is what prevents the webview
-  // itself from leaving the app if anything slips past this.
-  useEffect(() => {
-    const element = svgRef.current;
-    if (!element) return undefined;
-
-    const onClick = (event: MouseEvent) => {
+  // the link handling used for Markdown links. Delegate on the container so those
+  // links open in the system browser; the Rust navigation guard is what prevents
+  // the webview itself from leaving the app if anything slips past this.
+  //
+  // Attached through a ref callback rather than an effect: the SVG is inserted
+  // during commit, so an effect leaves a window where the diagram is visible but
+  // its links are inert. The callback runs in the same commit that inserts the
+  // node, so the two can never be observed apart.
+  const onSvgClick = useCallback(
+    (event: MouseEvent) => {
       const anchor = (event.target as Element | null)?.closest?.('a');
       if (!anchor) return;
       event.preventDefault();
@@ -107,11 +109,27 @@ export function MermaidBlock({ source, theme, disabled = false }: MermaidBlockPr
       if (href && /^(https?:|mailto:)/i.test(href)) {
         void platform.openExternal(href);
       }
-    };
+    },
+    [platform],
+  );
 
-    element.addEventListener('click', onClick);
-    return () => element.removeEventListener('click', onClick);
-  }, [svg, platform]);
+  const attachSvg = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (svgRef.current && svgRef.current !== node) {
+        svgRef.current.removeEventListener('click', onSvgClick);
+      }
+      svgRef.current = node;
+      if (node) node.addEventListener('click', onSvgClick);
+    },
+    [onSvgClick],
+  );
+
+  useEffect(
+    () => () => {
+      svgRef.current?.removeEventListener('click', onSvgClick);
+    },
+    [onSvgClick],
+  );
 
   if (disabled) {
     return (
@@ -135,7 +153,7 @@ export function MermaidBlock({ source, theme, disabled = false }: MermaidBlockPr
   return (
     <div className="mermaid-block" ref={containerRef}>
       {svg ? (
-        <div className="mermaid-svg" ref={svgRef} dangerouslySetInnerHTML={{ __html: svg }} />
+        <div className="mermaid-svg" ref={attachSvg} dangerouslySetInnerHTML={{ __html: svg }} />
       ) : (
         <p className="mermaid-pending">Rendering diagram…</p>
       )}
