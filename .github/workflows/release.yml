@@ -71,8 +71,9 @@ jobs:
           path: ${{ runner.temp }}/installers/*
           if-no-files-found: error
 
+      # Runs on manual builds too, so the note and checksum generation is not
+      # first exercised on a real release.
       - name: Compose release notes
-        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
           $rows = Get-ChildItem $env:STAGING | ForEach-Object {
@@ -85,6 +86,10 @@ jobs:
           $path = Join-Path $env:RUNNER_TEMP "notes.md"
           Set-Content -Path $path -Value $notes -Encoding utf8
           "NOTES=$path" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          Write-Host "--- notes preview ---"
+          Get-Content $path | Select-Object -First 4
+          Get-Content $path | Select-Object -Last 6
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
