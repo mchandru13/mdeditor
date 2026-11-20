@@ -13,7 +13,7 @@
  */
 import { chromium } from 'playwright-core';
 import { spawn, execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const EXE = process.argv[2] ?? join('src-tauri', 'target', 'release', 'mdeditor.exe');
