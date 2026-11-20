@@ -315,7 +315,7 @@ npm run check:security   # attack probes against the packaged app
 
 `check:e2e` drives the packaged application through a full editing session: it writes a temporary Markdown file, opens it with `--file`, renders it, types into the editor, replaces text through the find-and-replace UI, saves with Ctrl+S and verifies the bytes on disk, modifies the file from outside and confirms the reload, copies rendered HTML, and switches to Read Mode. Native dialogs (file picker, print, export destination) are the only part of the flow that cannot be automated.
 
-`check:ui` needs Edge installed and a running preview server; `check:app` and `check:e2e` need a release build (and network access for the remote document). `check:e2e` writes its document to a temporary directory, removes it afterwards, and closes the tab it opened so the restored session is left as it was.
+`check:ui` needs Edge installed and a running preview server; `check:app`, `check:e2e` and `check:security` need a release build, and `check:app`/`check:security` need network access for the remote document and the remote image. `check:e2e` writes its document to a temporary directory, removes it afterwards, and closes the tab it opened so the restored session is left as it was.
 
 ### Manual smoke checklist (packaged build)
 
