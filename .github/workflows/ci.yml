@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: TypeScript, tests and browser check
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Build production bundle
+        run: npm run build
+
+      # check:ui drives the built UI in Edge, the same Chromium engine WebView2
+      # uses. It is the only automated check that would catch a broken preview.
+      # Output is redirected to files: an inherited pipe would keep the step alive.
+      - name: Start preview server
+        shell: pwsh
+        run: |
+          Start-Process -FilePath "npm.cmd" -ArgumentList "run", "preview" `
+            -RedirectStandardOutput "$env:RUNNER_TEMP\preview.log" `
+            -RedirectStandardError "$env:RUNNER_TEMP\preview.err" `
+            -NoNewWindow
+          foreach ($attempt in 1..60) {
+            try {
+              $response = Invoke-WebRequest http://localhost:4173 -UseBasicParsing -TimeoutSec 2
+              if ($response.StatusCode -eq 200) { Write-Host "preview server ready"; exit 0 }
+            } catch {
+              Start-Sleep -Seconds 1
+            }
+          }
+          Get-Content "$env:RUNNER_TEMP\preview.log", "$env:RUNNER_TEMP\preview.err" -ErrorAction SilentlyContinue
+          throw "The preview server did not become reachable on port 4173."
+
+      - name: Browser check
+        run: node scripts/browser-check.mjs http://localhost:4173
+
+  native:
+    name: Rust tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      # tauri-build reads the frontend dist at compile time and fails without it,
+      # so the frontend is built before cargo test.
+      - name: Build frontend
+        run: npm run build
+
+      - name: Rust tests
+        run: npm run test:rust

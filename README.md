@@ -1,5 +1,7 @@
 # Markdown Editor
 
+[![CI](https://github.com/mchandru13/mdeditor/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/mchandru13/mdeditor/actions/workflows/ci.yml)
+
 A local-first Markdown viewer and editor for Windows, built with Tauri 2, Rust, React and TypeScript. It opens Markdown files in tabs, renders GitHub-flavoured Markdown with syntax highlighting, KaTeX math and Mermaid diagrams, and offers three workspace modes: **Read**, **Edit** and **Split**.
 
 The frontend is framework-independent of Tauri: every native capability goes through a single platform interface (`src/platform/`), which the tests replace with an in-memory implementation. The same interface lets `npm run dev` run in a plain browser with no native features, which is useful for UI work and for the performance audit.
@@ -67,6 +69,29 @@ Windows bundles are generated for **NSIS** (`.exe`) and **WiX** (`.msi`). Verifi
 | `src-tauri/target/release/bundle/msi/Markdown Editor_1.0.0_x64_en-US.msi` | 10.7 MiB |
 
 Icons live in `src-tauri/icons/` and are generated from `app-icon.png` with `npx tauri icon app-icon.png`.
+
+## Continuous integration and releasing
+
+Two GitHub Actions workflows live in `.github/workflows/`:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 195 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
+| `Release` | a `v*` tag, or manual dispatch | builds the NSIS and MSI installers; on a tag, publishes them as a GitHub Release with checksums |
+
+A manual `Release` run builds the installers and keeps them as workflow artifacts without publishing, which is the way to test packaging changes.
+
+Publishing a version:
+
+```bash
+# 1. bump all three, they must agree or the workflow fails
+#    package.json, src-tauri/Cargo.toml, src-tauri/tauri.conf.json
+git commit -am "Release 1.0.1"
+git tag -a v1.0.1 -m "Markdown Editor 1.0.1"
+git push origin master --follow-tags
+```
+
+The workflow refuses to publish when the tag and the three version fields disagree, so an installer named `1.0.0` can never be attached to a `v1.0.2` release.
 
 ## npm scripts
 
