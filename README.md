@@ -78,7 +78,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 195 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
+| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 202 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
 | `Release` | a `v*` tag, or manual dispatch | builds the NSIS and MSI installers; on a tag, publishes them as a GitHub Release with checksums |
 
 A manual `Release` run builds the installers and keeps them as workflow artifacts without publishing, which is the way to test packaging changes.
@@ -114,6 +114,7 @@ The workflow refuses to publish when the tag and the three version fields disagr
 | `npm run check:app` | Playwright + CDP smoke test against the packaged desktop app |
 | `npm run check:menu` | Windows UI Automation check of the native menu bar |
 | `npm run check:e2e` | End-to-end run of the packaged app: open, edit, replace, save, external change, modes |
+| `npm run check:security` | Attacks the packaged app: navigation escape, remote-image beaconing, hostile Markdown |
 
 ## Using the application
 
@@ -236,11 +237,13 @@ Key decisions:
 1. Raw HTML is **disabled**. HTML in Markdown is converted to literal text, so neither `rehype-raw` nor any document HTML reaches the DOM.
 2. `rehype-sanitize` runs with an explicit allowlist (`buildSanitizeSchema`): GFM elements, task lists, footnotes, `hljs-*` classes and the three app placeholder classes. No `style`, `svg`, `iframe`, `object` or `on*` attributes.
 3. URL protocols are limited to `http`, `https`, `mailto` and the Tauri asset protocol; `javascript:`, `vbscript:`, `data:` and `file:` are rejected.
-4. KaTeX renders with `trust: false`; Mermaid is initialised with `securityLevel: 'strict'` and its SVG is validated before being inlined into an export.
+4. KaTeX renders with `trust: false`; Mermaid is initialised with `securityLevel: 'strict'`, and the SVG it produces is checked by the same `isSafeSvg` guard in the live viewer and in exported HTML. Mermaid `click` links are routed through the system browser rather than the webview.
 5. External links open in the system browser through the opener plugin; the webview never navigates away.
-6. CSP (`tauri.conf.json`): `default-src 'self'`, `script-src 'self'`, `frame-src 'none'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`. `style-src 'unsafe-inline'` is required because Mermaid and KaTeX inject style elements.
-7. Tauri capabilities are limited to dialogs, clipboard text, opening external URLs and the app's own commands. There are no `fs:`, `shell:` or `http:` plugin permissions; reads and writes go through commands that enforce an extension allowlist and 64 MB caps.
-8. No analytics, telemetry or background network requests exist. Remote fetching happens only through the explicit URL action.
+6. **The webview cannot navigate off-origin.** `src-tauri/src/navigation.rs` registers an `on_navigation` guard that cancels any navigation to a URL other than the bundled app origin (plus `http://localhost:1420` in debug builds only). Without it a rendered anchor could replace the app UI with a foreign page inside the app window — Mermaid `click` directives produce exactly such anchors.
+7. CSP (`tauri.conf.json`): `default-src 'self'`, `script-src 'self'`, `frame-src 'none'`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`. `style-src 'unsafe-inline'` is required because Mermaid and KaTeX inject style elements.
+8. Tauri capabilities are limited to dialogs, clipboard text, opening external URLs and the app's own commands. There are no `fs:`, `shell:` or `http:` plugin permissions; reads and writes go through commands that enforce an extension allowlist — readable: `md`, `markdown`; writable: those plus `html`/`htm` for export — and 64 MB caps.
+9. **Remote images are blocked by default.** An `https:` image in a local document is replaced with a placeholder showing its alt text, so opening a file cannot beacon to a third-party server. The preview then offers *Load images* for that document, and the choice applies to that tab only. Export is unaffected: it keeps remote images as references.
+10. No analytics or telemetry exist. The only network requests are the explicit **Open URL** action and remote images the user chose to load.
 
 The adversarial corpus in `tests/unit/security.test.ts` covers script tags, event handlers, `javascript:` and entity-encoded variants, SVG/`foreignObject`, `data:`/`file:` sources, inline styles, forms and Mermaid injection attempts, asserting inert output in both the viewer and exported HTML.
 
@@ -278,8 +281,8 @@ Lighthouse cannot interact with the application, so this measures the **empty wo
 ## Testing
 
 ```bash
-npm test        # 195 tests (Vitest + React Testing Library, jsdom)
-npm run test:rust  # 29 tests (cargo test)
+npm test        # 202 tests (Vitest + React Testing Library, jsdom)
+npm run test:rust  # 36 tests (cargo test)
 ```
 
 Coverage:
@@ -305,6 +308,7 @@ npm run check:ui         # 17 assertions against http://localhost:4173
 npm run tauri:build      # then
 npm run check:app        # attaches to the packaged app over CDP and opens a remote document
 npm run check:e2e        # full session against the packaged app
+npm run check:security   # attack probes against the packaged app
 ```
 
 `check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, replace-all, the TOC, and zero page errors. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
@@ -337,12 +341,13 @@ Everything below was executed on the reference machine (11th Gen Intel Core i5-1
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 195 passed |
-| Native tests | `npm run test:rust` | 29 passed |
+| Unit and integration tests | `npm test` | 202 passed |
+| Native tests | `npm run test:rust` | 36 passed |
 | File association | double-click a `.md` in Explorer | launches the app with that file; second file forwards to the running window (verified: 1 process, tab added) |
 | Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
 | End-to-end session | `npm run check:e2e` | 12/12: open via `--file`, render, edit, replace, save to disk, external reload, copy HTML, mode switch; four consecutive clean runs |
+| Security check | `npm run check:security` | 9/9: Mermaid link cannot navigate the webview, remote images are not fetched until opt-in, hostile Markdown stays inert, the window still closes |
 | Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation). Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
 | Desktop release build | `npm run tauri:build` | passed; NSIS and MSI installers produced |
 | Packaged app boot | run `src-tauri/target/release/mdeditor.exe` | process stayed alive, React mounted, and `%APPDATA%\com.rea.mdeditor\settings.json` was written through IPC with the expected defaults |

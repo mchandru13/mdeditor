@@ -55,6 +55,7 @@ export function useDocumentRender(
   mode: WorkspaceMode,
   platform: Platform,
   rendererRef: { current: Renderer | null },
+  allowRemoteImages = false,
 ): DocumentRender {
   const [state, setState] = useState<RenderState>({
     docId: null,
@@ -64,7 +65,7 @@ export function useDocumentRender(
   });
   const [rendering, setRendering] = useState(false);
   const [manualDocId, setManualDocId] = useState<string | null>(null);
-  const cache = useRef(new Map<string, { source: string; output: RenderOutput }>());
+  const cache = useRef(new Map<string, { source: string; allowRemote: boolean; output: RenderOutput }>());
   const seq = useRef(0);
 
   if (rendererRef.current === null) {
@@ -107,7 +108,7 @@ export function useDocumentRender(
     if (!doc || mode === 'edit' || !shouldRender) return undefined;
 
     const cached = cache.current.get(doc.id);
-    if (cached && cached.source === debouncedSource) {
+    if (cached && cached.source === debouncedSource && cached.allowRemote === allowRemoteImages) {
       setState({ docId: doc.id, source: debouncedSource, output: cached.output, error: null });
       setRendering(false);
       return undefined;
@@ -121,13 +122,14 @@ export function useDocumentRender(
       base: resourceBaseFor(doc),
       assetOrigin: platform.assetOrigin(),
       disableRichContent: doc.source.length > RICH_CONTENT_LIMIT,
+      remoteImages: allowRemoteImages ? ('allow' as const) : ('block' as const),
     };
 
     void getRenderer()
       .render(options, debouncedSource)
       .then((output) => {
         if (cancelled || id !== seq.current) return;
-        cache.current.set(doc.id, { source: debouncedSource, output });
+        cache.current.set(doc.id, { source: debouncedSource, allowRemote: allowRemoteImages, output });
         setState({ docId: doc.id, source: debouncedSource, output, error: null });
         setRendering(false);
       })
@@ -145,17 +147,17 @@ export function useDocumentRender(
     return () => {
       cancelled = true;
     };
-  }, [doc, mode, shouldRender, debouncedSource, platform, rendererRef, getRenderer]);
+  }, [doc, mode, shouldRender, debouncedSource, platform, rendererRef, getRenderer, allowRemoteImages]);
 
   // Leaving Edit Mode with a cached result must show it immediately.
   useEffect(() => {
     if (!doc || mode === 'edit') return;
     if (state.docId === doc.id) return;
     const cached = cache.current.get(doc.id);
-    if (cached) {
+    if (cached && cached.allowRemote === allowRemoteImages) {
       setState({ docId: doc.id, source: cached.source, output: cached.output, error: null });
     }
-  }, [doc, mode, state.docId]);
+  }, [doc, mode, state.docId, allowRemoteImages]);
 
   return {
     output: state.docId === doc?.id ? state.output : null,

@@ -706,6 +706,43 @@ describe('file association', () => {
   });
 });
 
+describe('remote images', () => {
+  async function openInReadMode(markdown: string) {
+    const result = renderApp({ clipboard: markdown }, 'read');
+    fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
+    await screen.findByRole('tab', { name: /Pasted document/ });
+    return result;
+  }
+
+  it('blocks remote images and offers to load them', async () => {
+    const { container } = await openInReadMode(
+      '# Remote\n\n![tracker](https://attacker.test/pixel.png)\n',
+    );
+
+    expect(await screen.findByText(/1 remote image not loaded/i)).toBeInTheDocument();
+    expect(container.querySelector('.markdown-body img')).toBeNull();
+    expect(screen.getByText(/\[remote image: tracker\]/)).toBeInTheDocument();
+  });
+
+  it('loads them after the per-document opt-in', async () => {
+    const { container } = await openInReadMode(
+      '# Remote\n\n![tracker](https://attacker.test/pixel.png)\n',
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Load images' }));
+
+    await waitFor(() => {
+      const img = container.querySelector('.markdown-body img');
+      expect(img?.getAttribute('src')).toBe('https://attacker.test/pixel.png');
+    });
+  });
+
+  it('does not offer the opt-in when there is nothing to load', async () => {
+    await openInReadMode('# Plain\n\nno images here\n');
+    expect(screen.queryByRole('button', { name: 'Load images' })).toBeNull();
+  });
+});
+
 describe('preferences', () => {
   it('persists the workspace mode and theme', async () => {
     const { platform } = renderApp({}, 'split');

@@ -1,7 +1,7 @@
 {
   "name": "mdeditor",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Local-first Markdown viewer and editor built with Tauri 2, React and TypeScript",
   "scripts": {
@@ -19,7 +19,8 @@
     "check:ui": "node scripts/browser-check.mjs",
     "check:app": "node scripts/app-check.mjs",
     "check:menu": "powershell -ExecutionPolicy Bypass -File scripts/menu-check.ps1",
-    "check:e2e": "node scripts/e2e.mjs"
+    "check:e2e": "node scripts/e2e.mjs",
+    "check:security": "node scripts/security-check.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",

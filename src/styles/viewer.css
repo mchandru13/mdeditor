@@ -285,6 +285,19 @@
   font-size: 0.9em;
 }
 
+/* A remote image replaced with its alt text because loading was declined. */
+.markdown-body .mdeditor-remote-image {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 1px dashed var(--border-strong, var(--border));
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--bg-inset);
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
 .mermaid-block {
   margin: 1em 0;
   padding: 12px;

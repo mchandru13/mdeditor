@@ -162,4 +162,40 @@ describe('markdown pipeline: resources', () => {
     const output = html('![alt](img/a.png)', { base: { kind: 'none' } });
     expect(output).toContain('src="img/a.png"');
   });
+
+  it('blocks remote images by default so opening a file cannot beacon', () => {
+    const output = render('![tracker](https://attacker.test/pixel.png)', {
+      base: { kind: 'file', dir: 'C:\\docs' },
+    });
+
+    // The URL may survive as a tooltip, but never as a fetchable attribute.
+    expect(toHtml(output.hast)).not.toContain('<img');
+    expect(toHtml(output.hast)).not.toContain('src="https://attacker.test');
+    expect(toHtml(output.hast)).toContain('mdeditor-remote-image');
+    expect(output.placeholders.blockedRemoteImages).toBe(1);
+  });
+
+  it('loads remote images when the document opts in', () => {
+    const output = render('![tracker](https://attacker.test/pixel.png)', {
+      base: { kind: 'file', dir: 'C:\\docs' },
+      remoteImages: 'allow',
+    });
+
+    expect(toHtml(output.hast)).toContain('https://attacker.test/pixel.png');
+    expect(output.placeholders.blockedRemoteImages).toBe(0);
+  });
+
+  it('still resolves local images when remote images are blocked', () => {
+    const output = render('![local](img/a.png)', {
+      base: { kind: 'file', dir: 'C:\\docs' },
+    });
+
+    expect(toHtml(output.hast)).toContain('http://asset.localhost/');
+    expect(output.placeholders.blockedRemoteImages).toBe(0);
+  });
+
+  it('keeps the alt text visible when a remote image is blocked', () => {
+    const output = render('![a chart](https://attacker.test/c.png)', { base: { kind: 'none' } });
+    expect(toHtml(output.hast)).toContain('a chart');
+  });
 });

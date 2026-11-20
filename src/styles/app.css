@@ -605,3 +605,19 @@ mark.search-hit-active {
 .large-doc p {
   margin: 0;
 }
+
+/* Remote images are blocked by default; this bar is the per-document opt-in. */
+.remote-images {
+  padding: 10px 16px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.remote-images p {
+  margin: 0;
+}

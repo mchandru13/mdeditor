@@ -11,6 +11,7 @@ import { visit } from 'unist-util-visit';
 import type { Element, Root } from 'hast';
 
 import { MERMAID_CLASS, MATH_DISPLAY_CLASS, MATH_INLINE_CLASS } from './markdownPipeline';
+import { isSafeSvg } from './svgSafety';
 
 export const EXPORT_LIMIT_BYTES = 25 * 1024 * 1024;
 
@@ -53,11 +54,7 @@ export class ExportTooLargeError extends Error {
   }
 }
 
-const UNSAFE_SVG = /<script|onload\s*=|onerror\s*=|javascript:/i;
-
-export function isSafeSvg(svg: string): boolean {
-  return !UNSAFE_SVG.test(svg);
-}
+export { isSafeSvg };
 
 function textOfEl(node: Element): string {
   return node.children

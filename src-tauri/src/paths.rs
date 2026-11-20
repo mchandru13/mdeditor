@@ -13,6 +13,10 @@ pub const MAX_DOCUMENT_BYTES: u64 = 64 * 1024 * 1024;
 
 const ALLOWED_EXTENSIONS: [&str; 2] = ["md", "markdown"];
 
+/// Extensions the app may write. `html`/`htm` exist only for the export action,
+/// which writes a self-contained file chosen through a save dialog.
+const WRITABLE_EXTENSIONS: [&str; 4] = ["md", "markdown", "html", "htm"];
+
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -105,7 +109,21 @@ pub fn modified_time(path: &Path) -> Result<u64, FsError> {
 }
 
 /// Write a document atomically, restoring the BOM when the source had one.
+///
+/// The extension is checked here as well as on read: without it the command is a
+/// general-purpose write primitive for anything the user can write, which turns
+/// any future script-injection bug into arbitrary file replacement.
 pub fn write_document(path: &Path, text: &str, bom: bool) -> Result<(), FsError> {
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(str::to_ascii_lowercase);
+
+    match extension.as_deref() {
+        Some(ext) if WRITABLE_EXTENSIONS.contains(&ext) => {}
+        _ => return Err(FsError::UnsupportedExtension),
+    }
+
     if text.len() as u64 > MAX_DOCUMENT_BYTES {
         return Err(FsError::TooLarge {
             size: text.len() as u64,
@@ -167,6 +185,32 @@ mod tests {
             read_document(&path).unwrap_err(),
             FsError::UnsupportedExtension
         );
+    }
+
+    #[test]
+    fn refuses_to_write_outside_the_allowlist() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        for name in ["run.bat", "payload.ps1", "no-extension", "shell.dll"] {
+            let path = dir.path().join(name);
+            assert_eq!(
+                write_document(&path, "x", false).unwrap_err(),
+                FsError::UnsupportedExtension,
+                "{name} should not be writable"
+            );
+            assert!(!path.exists(), "{name} must not be created");
+        }
+    }
+
+    #[test]
+    fn writes_html_for_export_but_not_markdown_only() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("export.html");
+        write_document(&path, "<!doctype html><p>x", false).expect("html export");
+        assert!(path.exists());
+
+        let md = dir.path().join("notes.MARKDOWN");
+        write_document(&md, "# x", false).expect("markdown, case-insensitive");
+        assert!(md.exists());
     }
 
     #[test]

@@ -180,6 +180,27 @@ interface PostProcessResult {
   text: string;
 }
 
+/** True for an http(s) URL that points at a remote host. */
+function isRemoteUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
+/**
+ * Replaces a remote image with inert text. The element is mutated in place, so
+ * the node keeps its position in the tree and the surrounding layout survives.
+ */
+function blockRemoteImage(element: Element, url: string, counter: { count: number }): void {
+  const alt = typeof element.properties?.alt === 'string' ? element.properties.alt : '';
+  const label = alt.trim().length > 0 ? alt : url;
+  element.tagName = 'span';
+  element.properties = {
+    className: ['mdeditor-remote-image'],
+    title: `Remote image not loaded: ${url}`,
+  };
+  element.children = [{ type: 'text', value: `[remote image: ${label}]` }];
+  counter.count += 1;
+}
+
 /**
  * Single-pass post-processing: resource URLs, placeholder counts and the plain
  * text used for statistics are collected in one traversal; heading ids and
@@ -189,6 +210,8 @@ interface PostProcessResult {
 function postProcess(tree: HastRoot, options: RenderOptions): PostProcessResult {
   const textParts: string[] = [];
   const placeholders = { mermaid: 0, math: 0 };
+  const blocked = { count: 0 };
+  const allowRemoteImages = options.remoteImages === 'allow';
 
   visit(tree, (node) => {
     if (node.type === 'text') {
@@ -208,6 +231,17 @@ function postProcess(tree: HastRoot, options: RenderOptions): PostProcessResult 
         if (element.tagName === 'a' && !resolved.local && !resolved.url.startsWith('#')) {
           element.properties.target = '_blank';
           element.properties.rel = ['noopener', 'noreferrer'];
+        }
+        // A document must not be able to phone home just by being opened. Local
+        // files resolve through the asset protocol (resolved.local), so only
+        // genuinely remote http(s) URLs are affected.
+        if (
+          element.tagName === 'img' &&
+          !allowRemoteImages &&
+          !resolved.local &&
+          isRemoteUrl(resolved.url)
+        ) {
+          blockRemoteImage(element, resolved.url, blocked);
         }
       }
     }
@@ -251,7 +285,7 @@ function postProcess(tree: HastRoot, options: RenderOptions): PostProcessResult 
 
   return {
     headings,
-    placeholders,
+    placeholders: { ...placeholders, blockedRemoteImages: blocked.count },
     text: textParts.join('').replace(/\s+/g, ' ').trim(),
   };
 }

@@ -1,14 +1,61 @@
 # Roadmap
 
-Remaining work for Markdown Editor 1.0.0. Nothing here blocks normal use: the
+Remaining work for Markdown Editor 1.0.1. Nothing here blocks normal use: the
 application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
 
-Current state: 195 TypeScript tests, 29 Rust tests, and three packaged-app checks
+Current state: 202 TypeScript tests, 36 Rust tests, and three packaged-app checks
 (`check:ui` 18/18, `check:app` 10/10, `check:e2e` 12/12) all pass. File
 associations for `.md` and `.markdown` are registered by the installer and
 verified by double-click and second-instance forwarding.
+
+## 0. Security review, fixed in 1.0.1
+
+Two defects were found by attacking the packaged app rather than reading its
+configuration, and both are fixed here.
+
+### 0.1 A document could navigate the webview away (fixed)
+
+A Mermaid `click ... href` directive produced a real anchor inside the rendered
+SVG, which bypassed the click handling used for Markdown links. Clicking it
+replaced the app UI with a foreign page. Tauri's ACL still refused every app
+command from that origin (`not allowed by ACL`), so it was UI takeover and a
+denial of service rather than code execution: the close handler then asked a
+frontend that no longer existed, so the window could not be closed.
+
+Fixed on three levels: `navigation.rs` cancels any navigation off the app origin
+at the engine level, Mermaid anchors open in the system browser instead, and the
+viewer now applies the same `isSafeSvg` check the exporter used.
+
+### 0.2 Local documents fetched remote images (fixed)
+
+`img-src` permits `https:`, so `![](https://attacker/pixel.png)` in any opened
+file produced a request — an IP and open-time beacon. This contradicted the
+claim that remote fetching happens only through the explicit URL action.
+
+Remote images are now replaced with inert text showing the alt text, and the
+preview offers *Load images* per document. Export still keeps remote images as
+references, because exporting is an explicit action.
+
+### 0.3 Also tightened
+
+`write_document` now enforces an extension allowlist (`md`, `markdown`, plus
+`html`/`htm` for export); previously only reads were checked, which left the
+command as a general file-write primitive. `isSafeSvg` moved to `svgSafety.ts`
+and now anchors its `javascript:` check to a URL attribute so a label reading
+"javascript: the good parts" is not rejected.
+
+### 0.4 Still open
+
+- `katex@0.16.47` is present in `node_modules` as a nested dependency of
+  `remark-math`, flagged by `npm audit` for GHSA-238p-pmpm-9mq7. It is **not in
+  the shipped bundle** (only `0.19.1` is; the vulnerable entry point is never
+  imported) but an `overrides` entry would silence the audit noise.
+- The CSP still allows `img-src https:` so the per-document opt-in can work. The
+  pipeline is what blocks the fetch, not the engine.
+- Remote images inside a *remote* document are also blocked by default; the same
+  *Load images* button applies.
 
 ---
 

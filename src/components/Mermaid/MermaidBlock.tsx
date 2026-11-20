@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { usePlatform } from '../../platform/context';
+import { isSafeSvg } from '../../lib/svgSafety';
+
 interface MermaidBlockProps {
   source: string;
   theme: 'light' | 'dark';
@@ -15,9 +18,11 @@ interface MermaidBlockProps {
 export function MermaidBlock({ source, theme, disabled = false }: MermaidBlockProps) {
   const reactId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const svgRef = useRef<HTMLDivElement | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
+  const platform = usePlatform();
 
   useEffect(() => {
     const element = containerRef.current;
@@ -59,7 +64,14 @@ export function MermaidBlock({ source, theme, disabled = false }: MermaidBlockPr
 
         try {
           const result = await mermaid.render(`mmd-${reactId}`, source);
-          if (!cancelled) setSvg(result.svg);
+          if (cancelled) return;
+          // The same check the exporter applies: Mermaid's sandbox is the first
+          // line of defence, this is the second.
+          if (!isSafeSvg(result.svg)) {
+            setError('Diagram contained unsafe markup and was not displayed.');
+            return;
+          }
+          setSvg(result.svg);
         } catch (renderError) {
           if (!cancelled) {
             setError(renderError instanceof Error ? renderError.message : String(renderError));
@@ -76,6 +88,30 @@ export function MermaidBlock({ source, theme, disabled = false }: MermaidBlockPr
       cancelled = true;
     };
   }, [visible, source, theme, disabled, reactId]);
+
+  // Mermaid `click` directives produce real anchors inside the SVG, which bypass
+  // the link handling used for Markdown links. Delegate here so those links open
+  // in the system browser; the Rust navigation guard is what prevents the webview
+  // itself from leaving the app if anything slips past this.
+  useEffect(() => {
+    const element = svgRef.current;
+    if (!element) return undefined;
+
+    const onClick = (event: MouseEvent) => {
+      const anchor = (event.target as Element | null)?.closest?.('a');
+      if (!anchor) return;
+      event.preventDefault();
+      const href =
+        anchor.getAttribute('href') ??
+        anchor.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+      if (href && /^(https?:|mailto:)/i.test(href)) {
+        void platform.openExternal(href);
+      }
+    };
+
+    element.addEventListener('click', onClick);
+    return () => element.removeEventListener('click', onClick);
+  }, [svg, platform]);
 
   if (disabled) {
     return (
@@ -99,7 +135,7 @@ export function MermaidBlock({ source, theme, disabled = false }: MermaidBlockPr
   return (
     <div className="mermaid-block" ref={containerRef}>
       {svg ? (
-        <div className="mermaid-svg" dangerouslySetInnerHTML={{ __html: svg }} />
+        <div className="mermaid-svg" ref={svgRef} dangerouslySetInnerHTML={{ __html: svg }} />
       ) : (
         <p className="mermaid-pending">Rendering diagram…</p>
       )}

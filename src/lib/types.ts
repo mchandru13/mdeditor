@@ -62,6 +62,12 @@ export interface RenderOptions {
   assetOrigin: string | null;
   /** Skip KaTeX/Mermaid placeholders entirely (large-document policy). */
   disableRichContent: boolean;
+  /**
+   * Whether images on remote hosts may load. Off by default: a local document
+   * must not be able to make the app contact a third-party server just because
+   * it was opened.
+   */
+  remoteImages?: 'block' | 'allow';
   /** Test hook: disable chunked parsing. Defaults to enabled. */
   chunking?: boolean;
 }
@@ -69,4 +75,6 @@ export interface RenderOptions {
 export interface PlaceholderSummary {
   mermaid: number;
   math: number;
+  /** Remote images replaced with a placeholder because loading was declined. */
+  blockedRemoteImages: number;
 }

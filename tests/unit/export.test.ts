@@ -90,7 +90,7 @@ describe('standalone HTML export', () => {
 
     const remote = await buildStandaloneHtml({
       ...baseOptions,
-      tree: treeFor('![a](https://example.com/a.png)'),
+      tree: treeFor('![a](https://example.com/a.png)', { remoteImages: 'allow' }),
     });
 
     expect(remote.report.imagesRemote).toBe(1);
@@ -100,7 +100,7 @@ describe('standalone HTML export', () => {
   it('replaces plain-http images, which the export CSP blocks', async () => {
     const { html, report } = await buildStandaloneHtml({
       ...baseOptions,
-      tree: treeFor('![a](http://example.com/a.png)'),
+      tree: treeFor('![a](http://example.com/a.png)', { remoteImages: 'allow' }),
     });
 
     expect(report.imagesRemote).toBe(0);

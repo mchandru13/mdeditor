@@ -90,6 +90,8 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  /** Documents where the user explicitly chose to load remote images. */
+  const [remoteImagesAllowed, setRemoteImagesAllowed] = useState<Set<DocId>>(() => new Set());
 
   const viewerRef = useRef<ViewerHandle | null>(null);
   const viewerElementRef = useRef<HTMLDivElement | null>(null);
@@ -111,7 +113,13 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const doc = activeDocument(documents);
 
   const previewMode = mode !== 'edit';
-  const render = useDocumentRender(doc, mode, platform, rendererRef);
+  const allowRemoteImages = doc ? remoteImagesAllowed.has(doc.id) : false;
+  const render = useDocumentRender(doc, mode, platform, rendererRef, allowRemoteImages);
+
+  const loadRemoteImages = useCallback(() => {
+    if (!doc) return;
+    setRemoteImagesAllowed((current) => new Set(current).add(doc.id));
+  }, [doc]);
 
   const onAnchor = useCallback((id: string) => {
     viewerRef.current?.scrollToHeading(id);
@@ -658,7 +666,10 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const ensureOutput = useCallback(async (): Promise<{ current: DocState; output: RenderOutput } | null> => {
     const current = activeDocument(stateRef.current);
     if (!current) return null;
-    if (render.output) return { current, output: render.output };
+    // Export keeps remote images as remote references, so a tree built with them
+    // blocked would silently degrade to placeholder text in the exported file.
+    const blockedRemote = (render.output?.placeholders.blockedRemoteImages ?? 0) > 0;
+    if (render.output && !blockedRemote) return { current, output: render.output };
 
     const renderer = rendererRef.current;
     if (!renderer) return null;
@@ -669,6 +680,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
           base: resourceBaseFor(current),
           assetOrigin: platform.assetOrigin(),
           disableRichContent: current.source.length > RICH_CONTENT_LIMIT,
+          remoteImages: 'allow',
         },
         current.source,
       );
@@ -992,6 +1004,18 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
                       <p>This document is large, so the preview is paused.</p>
                       <button type="button" className="button primary" onClick={render.renderNow}>
                         Render preview
+                      </button>
+                    </div>
+                  ) : null}
+                  {(render.output?.placeholders.blockedRemoteImages ?? 0) > 0 && !allowRemoteImages ? (
+                    <div className="remote-images" role="note">
+                      <p>
+                        {render.output?.placeholders.blockedRemoteImages} remote image
+                        {(render.output?.placeholders.blockedRemoteImages ?? 0) === 1 ? '' : 's'} not
+                        loaded, so this document cannot contact an external server.
+                      </p>
+                      <button type="button" className="button" onClick={loadRemoteImages}>
+                        Load images
                       </button>
                     </div>
                   ) : null}
