@@ -1,14 +1,19 @@
 # Roadmap
 
-Remaining work for Markdown Editor 1.0.2. Nothing here blocks normal use: the
+Remaining work after Markdown Editor 1.0.3. Nothing here blocks normal use: the
 application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
 
-Current state: 213 TypeScript tests, 36 Rust tests, and three packaged-app checks
-(`check:ui` 18/18, `check:app` 10/10, `check:e2e` 12/12) all pass. File
-associations for `.md` and `.markdown` are registered by the installer and
-verified by double-click and second-instance forwarding.
+Current state: 213 TypeScript tests and 36 Rust tests pass, re-run for 1.0.3 on
+2026-11-21. The three packaged-app checks (`check:ui` 18/18, `check:app` 10/10,
+`check:e2e` 12/12) last passed against the 1.0.2 build and were not re-run for
+1.0.3. File associations for `.md` and `.markdown` are registered by the
+installer and verified by double-click and second-instance forwarding.
+
+1.0.3 changed the installer only: `src-tauri/nsis/hooks.nsh` now tells the shell
+the association changed, so an upgrade repaints Explorer's cached `.md` icon. No
+application code changed in that release.
 
 ## 0. Security review, fixed in 1.0.1
 
@@ -128,7 +133,7 @@ checks for full coverage.
 | Drag-and-drop from Explorer | Covered at the platform-interface level (fake platform) but not from a real Explorer drag. |
 | Signed installer | Not done: requires a code-signing certificate and `bundle.windows.signCommand`. Until then Windows shows an unknown-publisher warning. |
 | Auto-update | Not implemented. Would need a release host and signing. |
-| `npm audit` | Clean as of 1.0.2: an `overrides` entry pins the nested `katex` (pulled by `remark-math`) to the app's own patched version, which removed the duplicate entirely. Recheck after dependency updates. |
+| `npm audit` | Clean as of 1.0.3 (checked 2026-11-21): an `overrides` entry pins the nested `katex` (pulled by `remark-math`) to the app's own patched version, which removed the duplicate entirely. Recheck after dependency updates. |
 
 ---
 

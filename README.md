@@ -12,9 +12,9 @@ Every published build is a GitHub Release:
 
 | Release | Installer | Notes |
 |---|---|---|
-| [v1.0.0](https://github.com/mchandru13/mdeditor/releases/tag/v1.0.0) | `Markdown Editor_1.0.0_x64-setup.exe` | Per-user install, no admin prompt |
+| [v1.0.3](https://github.com/mchandru13/mdeditor/releases/tag/v1.0.3) | `Markdown Editor_1.0.3_x64-setup.exe` | Per-user install, no admin prompt; upgrades repaint the cached `.md` icon |
 
-Newer versions are published the same way — see the [releases page](https://github.com/mchandru13/mdeditor/releases) for the current one.
+Earlier versions are on the [releases page](https://github.com/mchandru13/mdeditor/releases).
 
 The `.msi` on each release is for enterprise deployment (Group Policy, Intune); use the `.exe` otherwise. Installed builds go to `%LOCALAPPDATA%\Markdown Editor` and need about 13 MB. The installer is unsigned, so SmartScreen asks for confirmation; see [Install requirements](#install-requirements) below.
 
@@ -62,7 +62,7 @@ npm run build        # type-check and produce dist/
 npm run tauri:build  # produce installers in src-tauri/target/release/bundle/
 ```
 
-Windows bundles are generated for **NSIS** (`.exe`) and **WiX** (`.msi`). Verified outputs from the reference build:
+Windows bundles are generated for **NSIS** (`.exe`) and **WiX** (`.msi`). Sizes below are from the v1.0.0 reference build; installer file names carry whatever version `tauri.conf.json` declares, so they differ from these examples:
 
 | Artifact | Size |
 |---|---|
@@ -94,12 +94,12 @@ Publishing a version:
 ```bash
 # 1. bump all three, they must agree or the workflow fails
 #    package.json, src-tauri/Cargo.toml, src-tauri/tauri.conf.json
-git commit -am "Release 1.0.1"
-git tag -a v1.0.1 -m "Markdown Editor 1.0.1"
+git commit -am "Release 1.0.4"
+git tag -a v1.0.4 -m "Markdown Editor 1.0.4"
 git push origin master --follow-tags
 ```
 
-The workflow refuses to publish when the tag and the three version fields disagree, so an installer named `1.0.0` can never be attached to a `v1.0.2` release.
+The workflow refuses to publish when the tag and the three version fields disagree, so an installer named `1.0.3` can never be attached to a `v1.0.4` release.
 
 ## npm scripts
 
@@ -307,7 +307,7 @@ Two Playwright scripts exercise the real UI in Edge (the same Chromium engine as
 
 ```bash
 npm run preview          # in one terminal
-npm run check:ui         # 17 assertions against http://localhost:4173
+npm run check:ui         # 18 assertions against http://localhost:4173
 ```
 
 ```bash
@@ -342,6 +342,8 @@ npm run check:security   # attack probes against the packaged app
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
+Re-run for 1.0.3 on 2026-11-21 (Windows, Node 24.13.0): 213 Vitest tests, 36 Rust tests, typecheck, lint, `check:ui` (18/18) and `npm audit` (0 vulnerabilities) all pass. `check:app` and `check:e2e` date from the 1.0.2 build and were not re-run for 1.0.3.
+
 | Check | Command | Result |
 |---|---|---|
 | Type checking | `npm run typecheck` | passed, no diagnostics |
@@ -373,7 +375,7 @@ remaining work, deliberate limitations and unverified areas.
 - Editing a remote document and saving writes a local copy through Save As; the remote URL is never written back.
 - Session restore reads file contents lazily: only the active tab is loaded at start, others load when selected. A moved or deleted file is marked missing rather than recreated.
 - The 200 KB performance target is missed (~491 ms of pipeline time, see above). The 5 MB case is not interactive by design; the preview is opt-in.
-- `npm audit` reports three low-severity advisories with no upstream fix published: KaTeX prototype pollution that can bypass trust restrictions, and the `remark-math` / `micromark-extension-math` chain that depends on it. KaTeX renders with `trust: false` and the application never passes document values into its options, which limits exposure; upgrade when fixed releases exist.
+- `npm audit` is clean (0 vulnerabilities, checked on 2026-11-21): an `overrides` entry pins the nested `katex` that `remark-math` pulls in to the app's own patched version, which removed the duplicate advisory. Recheck after dependency updates.
 - External changes are detected when the window regains focus, not by a live filesystem watcher, so a change made while the window stays focused is noticed only after switching away and back.
 - Replace edits the Markdown source and is disabled in Read Mode; it does not rewrite rendered DOM.
 - Toggle items in the View menu do not show a check mark; the toolbar's pressed state reflects the same setting.
