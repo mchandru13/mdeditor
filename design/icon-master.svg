@@ -4,8 +4,7 @@
 
     Source of truth for every size in src-tauri/icons/. Regenerate with:
 
-        node scripts/render-icon.mjs   # this SVG -> app-icon.png (1024 px)
-        npx tauri icon app-icon.png    # app-icon.png -> all platform sizes
+        npm run icon        # this SVG -> app-icon.png -> all platform sizes
 
     Design notes, each one learned by rendering and looking at 16 px:
 
@@ -14,15 +13,19 @@
       Amber-on-ink reads on light, dark and cream shells.
     - No text lines. At 16 px they read as dirt; the folded corner plus the
       arrow already say "document".
-    - The arrow is ~62 % of the sheet width and its stem is ~16 %. Anything
+    - The arrow is ~56 % of the sheet width and its stem is ~13 %. Anything
       finer disappears when the sheet is only ~13 px wide.
-    - The artwork is inset so it never touches the canvas edge; Windows draws
-      a glyph, not a full-bleed tile.
+    - Everything is centred on the sheet's own centre (512), not on the canvas,
+      so the fold does not pull the arrow off-axis.
+
+    Sheet:  x 120..904, y 64..960   (centre 512, 512)
+    Fold:   144 px cut from the top-right corner
+    Arrow:  440 wide, 440 tall, centred at x=512, y=512
   -->
   <path d="M120 64 H760 L904 208 V960 H120 Z" fill="#E8B44A"/>
 
   <g fill="#1B2A4A">
-    <rect x="449" y="352" width="126" height="200"/>
-    <path d="M306 552 H698 L502 784 Z"/>
+    <rect x="449" y="292" width="126" height="200"/>
+    <path d="M292 492 H732 L512 732 Z"/>
   </g>
 </svg>

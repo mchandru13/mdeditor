@@ -76,7 +76,7 @@ Icons live in `src-tauri/icons/`. They are generated from `design/icon-master.sv
 npm run icon   # renders the SVG to app-icon.png, then generates every platform size
 ```
 
-The artwork is drawn rather than hand-painted so the geometry can be tuned until it survives 16 px. `design/icon-sizes.png` is the contact sheet used for that check: each variant is rendered at 16, 24, 32, 48, 64 and 128 px on light and dark backgrounds. Two findings came from it — a navy sheet disappears against the Windows dark taskbar, and any detail thinner than ~6 px at 1024 reads as noise when the sheet is only 13 px wide.
+The artwork is drawn rather than hand-painted so the geometry can be tuned until it survives 16 px. `design/icon-in-context.png` is the check that drove the design: the icon shown as a desktop shortcut, a 24/20/16 px taskbar slot and an Alt-Tab tile, on both light and dark shells. Two findings came from it — a navy sheet disappears against the dark Windows taskbar, and any detail thinner than about 6 px at 1024 reads as noise once the sheet is only 13 px wide.
 
 ## Continuous integration and releasing
 
