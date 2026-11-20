@@ -1,6 +1,6 @@
 [package]
 name = "mdeditor"
-version = "1.0.1"
+version = "1.0.2"
 description = "Local-first Markdown viewer and editor"
 authors = ["mdeditor"]
 edition = "2021"

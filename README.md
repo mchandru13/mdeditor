@@ -70,7 +70,13 @@ Windows bundles are generated for **NSIS** (`.exe`) and **WiX** (`.msi`). Verifi
 | `src-tauri/target/release/bundle/nsis/Markdown Editor_1.0.0_x64-setup.exe` | 10.1 MiB |
 | `src-tauri/target/release/bundle/msi/Markdown Editor_1.0.0_x64_en-US.msi` | 10.7 MiB |
 
-Icons live in `src-tauri/icons/` and are generated from `app-icon.png` with `npx tauri icon app-icon.png`.
+Icons live in `src-tauri/icons/`. They are generated from `design/icon-master.svg`, which is the source of truth:
+
+```bash
+npm run icon   # renders the SVG to app-icon.png, then generates every platform size
+```
+
+The artwork is drawn rather than hand-painted so the geometry can be tuned until it survives 16 px. `design/icon-sizes.png` is the contact sheet used for that check: each variant is rendered at 16, 24, 32, 48, 64 and 128 px on light and dark backgrounds. Two findings came from it — a navy sheet disappears against the Windows dark taskbar, and any detail thinner than ~6 px at 1024 reads as noise when the sheet is only 13 px wide.
 
 ## Continuous integration and releasing
 

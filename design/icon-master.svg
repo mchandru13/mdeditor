@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    Markdown Editor app icon.
+
+    Source of truth for every size in src-tauri/icons/. Regenerate with:
+
+        node scripts/render-icon.mjs   # this SVG -> app-icon.png (1024 px)
+        npx tauri icon app-icon.png    # app-icon.png -> all platform sizes
+
+    Design notes, each one learned by rendering and looking at 16 px:
+
+    - The sheet is the accent colour and the arrow is the ink, not the reverse.
+      A navy tile is invisible on a dark Windows taskbar (#1B2A4A on #202124).
+      Amber-on-ink reads on light, dark and cream shells.
+    - No text lines. At 16 px they read as dirt; the folded corner plus the
+      arrow already say "document".
+    - The arrow is ~62 % of the sheet width and its stem is ~16 %. Anything
+      finer disappears when the sheet is only ~13 px wide.
+    - The artwork is inset so it never touches the canvas edge; Windows draws
+      a glyph, not a full-bleed tile.
+  -->
+  <path d="M120 64 H760 L904 208 V960 H120 Z" fill="#E8B44A"/>
+
+  <g fill="#1B2A4A">
+    <rect x="449" y="352" width="126" height="200"/>
+    <path d="M306 552 H698 L502 784 Z"/>
+  </g>
+</svg>
