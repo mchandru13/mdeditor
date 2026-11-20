@@ -4,6 +4,16 @@ A local-first Markdown viewer and editor for Windows, built with Tauri 2, Rust, 
 
 The frontend is framework-independent of Tauri: every native capability goes through a single platform interface (`src/platform/`), which the tests replace with an in-memory implementation. The same interface lets `npm run dev` run in a plain browser with no native features, which is useful for UI work and for the performance audit.
 
+## Download
+
+Every published build is a GitHub Release:
+
+| Release | Installer | Notes |
+|---|---|---|
+| [v1.0.0](https://github.com/mchandru13/mdeditor/releases/tag/v1.0.0) | `Markdown Editor_1.0.0_x64-setup.exe` | Per-user install, no admin prompt |
+
+The `.msi` on each release is for enterprise deployment (Group Policy, Intune); use the `.exe` otherwise. Installed builds go to `%LOCALAPPDATA%\Markdown Editor` and need about 13 MB. The installer is unsigned, so SmartScreen asks for confirmation; see [Install requirements](#install-requirements) below.
+
 ## Requirements
 
 | Requirement | Version used |
@@ -16,6 +26,20 @@ The frontend is framework-independent of Tauri: every native capability goes thr
 | WebView2 Runtime | installed on Windows 11 and current Windows 10 |
 
 If `cargo` is not on your `PATH`, add `%USERPROFILE%\.cargo\bin`. Tauri resolves `link.exe` through the Visual Studio installation; no developer prompt is required once the build tools are installed.
+
+### Install requirements
+
+Only needed to run the released installer, not to build:
+
+| Requirement | Detail |
+|---|---|
+| Windows 10 or 11, x64 | ARM64 runs the x64 build under emulation |
+| WebView2 Runtime | preinstalled on Windows 11 and updated Windows 10. If absent, the installer downloads Microsoft's bootstrapper (~2 MB), so the install needs network access |
+| Administrator rights | not required — `currentUser` install into `%LOCALAPPDATA%` |
+| VC++ redistributable | not required — the binary imports no `vcruntime`/`msvcp`/`ucrt` DLLs |
+| Disk | ~13 MB installed |
+
+Two first-run surprises are expected rather than broken: SmartScreen warns because the build is unsigned (*More info → Run anyway*), and Windows may keep an existing `.md` handler until you choose *Open with → Markdown Editor → Always use this app* once.
 
 ## Install and run
 
