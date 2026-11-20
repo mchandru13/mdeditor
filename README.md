@@ -14,6 +14,8 @@ Every published build is a GitHub Release:
 |---|---|---|
 | [v1.0.0](https://github.com/mchandru13/mdeditor/releases/tag/v1.0.0) | `Markdown Editor_1.0.0_x64-setup.exe` | Per-user install, no admin prompt |
 
+Newer versions are published the same way — see the [releases page](https://github.com/mchandru13/mdeditor/releases) for the current one.
+
 The `.msi` on each release is for enterprise deployment (Group Policy, Intune); use the `.exe` otherwise. Installed builds go to `%LOCALAPPDATA%\Markdown Editor` and need about 13 MB. The installer is unsigned, so SmartScreen asks for confirmation; see [Install requirements](#install-requirements) below.
 
 ## Requirements
