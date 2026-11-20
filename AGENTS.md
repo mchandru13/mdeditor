@@ -143,6 +143,7 @@ Notes that save time:
 
 ## Build and release gotchas
 
+- **The installer must notify the shell after changing the association.** Windows caches file-type icons by icon *path and index*, both of which are identical across versions (`…\mdeditor.exe,0`), so an upgrade that changes only the artwork keeps showing the cached old bitmap. `src-tauri/nsis/hooks.nsh` calls `SHChangeNotify(SHCNE_ASSOCCHANGED)` after install and uninstall for this reason. Removing that hook reintroduces a bug that no amount of rebuilding will reveal — the exe has the right icon while Explorer draws the old one.
 - **Version lives in three files** and they must agree: `package.json`,
   `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`. The release workflow
   refuses to publish when they disagree with the tag.
