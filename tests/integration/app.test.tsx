@@ -9,11 +9,13 @@ vi.mock('../../src/components/Editor/Editor', () => {
     {
       value,
       onChange,
+      spellCheck,
     }: {
       value: string;
       onChange: (value: string) => void;
       docId: string;
       initialScroll: number;
+      spellCheck?: boolean;
     },
     ref,
   ) {
@@ -32,6 +34,7 @@ vi.mock('../../src/components/Editor/Editor', () => {
     return (
       <textarea
         aria-label="Markdown source editor"
+        data-spellcheck={String(spellCheck ?? true)}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -63,8 +66,17 @@ describe('workspace modes', () => {
   it('starts empty and explains the available entry points', async () => {
     renderApp();
     expect(await screen.findByText('No document open')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New document' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Browse for file' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open a URL' })).toBeInTheDocument();
+  });
+
+  it('creates an untitled document from the empty state', async () => {
+    renderApp();
+    fireEvent.click(await screen.findByRole('button', { name: 'New document' }));
+
+    expect(await screen.findByRole('tab', { name: /Untitled 1/ })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Markdown source editor')).toHaveValue('');
   });
 
   it('shows only the editor in Edit Mode', async () => {
@@ -744,6 +756,53 @@ describe('remote images', () => {
 });
 
 describe('preferences', () => {
+  it('turns spell check off and persists the choice', async () => {
+    const { platform } = await openFromClipboard('# prose\n\nteh quikc brown\n');
+    expect(screen.getByLabelText('Markdown source editor')).toHaveAttribute(
+      'data-spellcheck',
+      'true',
+    );
+
+    await act(async () => {
+      platform.emitMenu('view.spellCheck');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Markdown source editor')).toHaveAttribute(
+        'data-spellcheck',
+        'false',
+      );
+    });
+
+    await waitFor(
+      () => {
+        const latest = platform.settingsWrites.at(-1);
+        expect(JSON.parse(latest ?? '{}')).toMatchObject({ spellCheck: false });
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it('restores a persisted spell check preference', async () => {
+    const settings = JSON.stringify({
+      version: 1,
+      theme: 'system',
+      mode: 'split',
+      tocVisible: true,
+      spellCheck: false,
+      splitRatio: 0.5,
+      docs: [],
+      activeIndex: 0,
+    });
+    renderApp({ settings });
+    await screen.findByRole('button', { name: 'New document' });
+    fireEvent.click(screen.getByRole('button', { name: 'New document' }));
+    expect(await screen.findByLabelText('Markdown source editor')).toHaveAttribute(
+      'data-spellcheck',
+      'false',
+    );
+  });
+
   it('persists the workspace mode and theme', async () => {
     const { platform } = renderApp({}, 'split');
 

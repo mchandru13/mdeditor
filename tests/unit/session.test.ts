@@ -7,7 +7,13 @@ import {
   serializeSettings,
 } from '../../src/state/session';
 
-const UI = { theme: 'dark' as const, mode: 'split' as const, tocVisible: true, splitRatio: 0.4 };
+const UI = {
+  theme: 'dark' as const,
+  mode: 'split' as const,
+  tocVisible: true,
+  spellCheck: true,
+  splitRatio: 0.4,
+};
 
 describe('session serialization', () => {
   it('stores only the path for a clean file document', () => {
@@ -94,6 +100,27 @@ describe('session serialization', () => {
 });
 
 describe('session parsing guards', () => {
+  it('round-trips the spell check preference', () => {
+    const on = parseSettings(serializeSettings([], null, { ...UI, spellCheck: false }, isDirty));
+    expect(on?.spellCheck).toBe(false);
+
+    const off = parseSettings(serializeSettings([], null, { ...UI, spellCheck: true }, isDirty));
+    expect(off?.spellCheck).toBe(true);
+  });
+
+  it('defaults spell check to on when an older file omits it', () => {
+    const json = JSON.stringify({
+      version: 1,
+      theme: 'light',
+      mode: 'split',
+      tocVisible: true,
+      splitRatio: 0.5,
+      docs: [],
+      activeIndex: 0,
+    });
+    expect(parseSettings(json)?.spellCheck).toBe(true);
+  });
+
   it('returns null for missing settings', () => {
     expect(parseSettings(null)).toBeNull();
     expect(parseSettings('')).toBeNull();

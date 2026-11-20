@@ -26,6 +26,7 @@ export interface PersistedSettings {
   theme: ThemeMode;
   mode: WorkspaceMode;
   tocVisible: boolean;
+  spellCheck: boolean;
   splitRatio: number;
   docs: PersistedDoc[];
   activeIndex: number;
@@ -35,6 +36,7 @@ export interface PersistedUi {
   theme: ThemeMode;
   mode: WorkspaceMode;
   tocVisible: boolean;
+  spellCheck: boolean;
   splitRatio: number;
 }
 
@@ -120,6 +122,7 @@ export function serializeSettings(
     theme: ui.theme,
     mode: ui.mode,
     tocVisible: ui.tocVisible,
+    spellCheck: ui.spellCheck,
     splitRatio: ui.splitRatio,
     docs: persisted,
     activeIndex,
@@ -172,6 +175,9 @@ export function parseSettings(raw: string | null): PersistedSettings | null {
     theme,
     mode,
     tocVisible: parsed.tocVisible !== false,
+    // On by default. The previous hard-disabled behaviour was wrong for prose,
+    // and a writing tool should spell-check unless told otherwise.
+    spellCheck: parsed.spellCheck !== false,
     splitRatio:
       typeof parsed.splitRatio === 'number' && parsed.splitRatio > 0.15 && parsed.splitRatio < 0.85
         ? parsed.splitRatio

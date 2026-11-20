@@ -73,6 +73,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const [tocVisible, setTocVisible] = useState(true);
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [syncScroll, setSyncScroll] = useState(true);
+  const [spellCheck, setSpellCheck] = useState(true);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -288,6 +289,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         setTheme(parsed.theme);
         setMode(initialMode ?? parsed.mode);
         setTocVisible(parsed.tocVisible);
+        setSpellCheck(parsed.spellCheck);
         setSplitRatio(parsed.splitRatio);
 
         const restoredIds: DocId[] = [];
@@ -325,6 +327,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         theme,
         mode,
         tocVisible,
+        spellCheck,
         splitRatio,
       }, isDirty);
 
@@ -334,7 +337,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [documents, theme, mode, tocVisible, splitRatio, hydrated, platform]);
+  }, [documents, theme, mode, tocVisible, spellCheck, splitRatio, hydrated, platform]);
 
   // Load file contents for restored tabs that only had a path.
   useEffect(() => {
@@ -809,6 +812,9 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         case 'view.toc':
           setTocVisible((value) => !value);
           break;
+        case 'view.spellCheck':
+          setSpellCheck((value) => !value);
+          break;
         case 'view.syncScroll':
           setSyncScroll((value) => !value);
           break;
@@ -901,7 +907,10 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
       <h2>No document open</h2>
       <p>Open a Markdown file, drop one onto the window, or start from the clipboard.</p>
       <div className="empty-actions">
-        <button type="button" className="button primary" onClick={() => void openFromDialog()}>
+        <button type="button" className="button primary" onClick={newDocument}>
+          New document
+        </button>
+        <button type="button" className="button" onClick={() => void openFromDialog()}>
           Browse for file
         </button>
         <button type="button" className="button" onClick={() => setUrlDialogOpen(true)}>
@@ -988,6 +997,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
                   initialScroll={doc.scroll.editor}
                   onChange={(source) => dispatch({ type: 'edit', id: doc.id, source })}
                   onScroll={onEditorScroll}
+                  spellCheck={spellCheck}
                 />
               </div>
             ) : null}

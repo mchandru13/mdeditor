@@ -1,11 +1,11 @@
 # Roadmap
 
-Remaining work for Markdown Editor 1.0.1. Nothing here blocks normal use: the
+Remaining work for Markdown Editor 1.0.2. Nothing here blocks normal use: the
 application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
 
-Current state: 202 TypeScript tests, 36 Rust tests, and three packaged-app checks
+Current state: 213 TypeScript tests, 36 Rust tests, and three packaged-app checks
 (`check:ui` 18/18, `check:app` 10/10, `check:e2e` 12/12) all pass. File
 associations for `.md` and `.markdown` are registered by the installer and
 verified by double-click and second-instance forwarding.
@@ -48,10 +48,6 @@ and now anchors its `javascript:` check to a URL attribute so a label reading
 
 ### 0.4 Still open
 
-- `katex@0.16.47` is present in `node_modules` as a nested dependency of
-  `remark-math`, flagged by `npm audit` for GHSA-238p-pmpm-9mq7. It is **not in
-  the shipped bundle** (only `0.19.1` is; the vulnerable entry point is never
-  imported) but an `overrides` entry would silence the audit noise.
 - The CSP still allows `img-src https:` so the per-document opt-in can work. The
   pipeline is what blocks the fetch, not the engine.
 - Remote images inside a *remote* document are also blocked by default; the same
@@ -59,39 +55,23 @@ and now anchors its `javascript:` check to a URL attribute so a label reading
 
 ---
 
-## 1. Improvements offered but not yet built
+## 1. Improvements
 
-These are the only items where the application could reasonably be considered
-incomplete rather than deliberately scoped. Ordered by value.
+The first two were built in 1.0.2 and are recorded here so the reasoning survives.
+The rest are the only remaining items where the application could reasonably be
+considered incomplete rather than deliberately scoped.
 
-### 1.1 Spell check toggle
+### 1.1 Spell check toggle (done)
 
-**Problem.** `src/components/Editor/Editor.tsx` sets
-`EditorView.contentAttributes.of({ spellcheck: 'false' })`. This suppresses the
-WebView's spell-check squiggles entirely. It was chosen to avoid a wall of red
-underlines in code-heavy notes, but for prose writing it is the wrong default.
+Editor spell checking is now on by default, with **View -> Toggle Spell Check**
+and a persisted `spellCheck` preference. The constant `spellcheck: 'false'` and
+its rationale are gone; `src/App.tsx` owns the setting and the editor applies it
+through a `Compartment`, so toggling does not recreate the view.
 
-**Proposal.** Enable `spellcheck` by default and add a View menu item
-("Spell Check") plus a persisted preference, so the behaviour is the user's
-choice rather than a hidden constant.
+### 1.2 "New document" in the empty workspace (done)
 
-**Scope.** ~20 minutes. `View > Spell Check` (checkbox item), one entry in the
-persisted settings version, one compartment reconfigure in the editor, README
-row in the View table.
-
-**Risk.** Low. No data path changes.
-
-### 1.2 "New document" in the empty workspace
-
-**Problem.** With no tabs open, the empty state offers "Browse for file",
-"Open a URL" and "Paste from clipboard" — but not "New", which now exists in the
-toolbar, the File menu and Ctrl+N. A first-time user can therefore miss that a
-blank document is possible.
-
-**Proposal.** Add a fourth button, `New document`, wired to the existing
-`newDocument()` handler.
-
-**Scope.** ~5 minutes plus a rebuild and a re-run of `check:ui`.
+The empty state now leads with **New document** (primary), followed by Browse,
+Open a URL and Paste from clipboard.
 
 ### 1.3 Drag to reorder tabs
 
@@ -148,7 +128,7 @@ checks for full coverage.
 | Drag-and-drop from Explorer | Covered at the platform-interface level (fake platform) but not from a real Explorer drag. |
 | Signed installer | Not done: requires a code-signing certificate and `bundle.windows.signCommand`. Until then Windows shows an unknown-publisher warning. |
 | Auto-update | Not implemented. Would need a release host and signing. |
-| `npm audit`: 3 low advisories | KaTeX prototype pollution via `remark-math`; no fixed release published. Mitigated by `trust: false` and never passing document values into KaTeX options. Recheck each dependency update. |
+| `npm audit` | Clean as of 1.0.2: an `overrides` entry pins the nested `katex` (pulled by `remark-math`) to the app's own patched version, which removed the duplicate entirely. Recheck after dependency updates. |
 
 ---
 
@@ -168,11 +148,10 @@ without agreeing to change the product.
 
 ## 5. If work resumes, do it in this order
 
-1. Spell check toggle (§1.1) — smallest change with the clearest user benefit.
-2. Empty-state "New" button (§1.2) — closes an onboarding gap.
-3. Verify the three native dialogs by hand and record the result (§3).
-4. Tab reordering via keyboard (§1.3).
-5. Only then consider the performance work in §2, with a measurement plan first.
+1. Verify the three native dialogs by hand and record the result (§3).
+2. Tab reordering via keyboard (§1.3).
+3. Thin the menu/toolbar duplication (§1.4) if it bothers you in daily use.
+4. Only then consider the performance work in §2, with a measurement plan first.
 
 Every item above must leave `npm test`, `npm run test:rust`, `npm run typecheck`,
 `npm run lint` and `npm run build` green, and re-run `check:ui`, `check:app` and

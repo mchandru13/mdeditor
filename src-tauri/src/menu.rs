@@ -79,6 +79,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "view.toc", "Toggle Contents", true, None::<&str>)?,
             &MenuItem::with_id(app, "view.syncScroll", "Toggle Sync Scroll", true, None::<&str>)?,
+            &MenuItem::with_id(app, "view.spellCheck", "Toggle Spell Check", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &theme,
         ],

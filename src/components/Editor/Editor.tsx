@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { Compartment, EditorState } from '@codemirror/state';
 import {
   EditorView,
@@ -37,6 +37,8 @@ export interface EditorProps {
   /** Restored when switching tabs. */
   initialScroll: number;
   readOnly?: boolean;
+  /** WebView spell checking. On by default; off is useful for code-heavy notes. */
+  spellCheck?: boolean;
 }
 
 /**
@@ -60,7 +62,7 @@ const highlight = HighlightStyle.define([
 ]);
 
 export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
-  { docId, value, onChange, onScroll, initialScroll, readOnly = false },
+  { docId, value, onChange, onScroll, initialScroll, readOnly = false, spellCheck = true },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -68,8 +70,18 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const currentDocRef = useRef<DocId>(docId);
   const onChangeRef = useRef(onChange);
   const readOnlyCompartment = useRef(new Compartment());
+  const spellCheckCompartment = useRef(new Compartment());
 
   onChangeRef.current = onChange;
+
+  /** Content attributes, kept in one place so `aria-label` cannot be lost. */
+  const contentAttributes = useCallback(
+    (enabled: boolean) => ({
+      'aria-label': 'Markdown source editor',
+      spellcheck: enabled ? 'true' : 'false',
+    }),
+    [],
+  );
 
   useEffect(() => {
     const host = hostRef.current;
@@ -88,10 +100,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         markdown(),
         syntaxHighlighting(highlight),
         EditorView.lineWrapping,
-        EditorView.contentAttributes.of({
-          'aria-label': 'Markdown source editor',
-          spellcheck: 'false',
-        }),
+        spellCheckCompartment.current.of(EditorView.contentAttributes.of(contentAttributes(spellCheck))),
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) onChangeRef.current(update.state.doc.toString());
@@ -153,6 +162,16 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       effects: readOnlyCompartment.current.reconfigure(EditorState.readOnly.of(readOnly)),
     });
   }, [readOnly]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: spellCheckCompartment.current.reconfigure(
+        EditorView.contentAttributes.of(contentAttributes(spellCheck)),
+      ),
+    });
+  }, [spellCheck, contentAttributes]);
 
   useImperativeHandle(ref, () => ({
     focus() {
