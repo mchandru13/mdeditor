@@ -5,10 +5,11 @@ application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
 
-Current state: 285 TypeScript tests and 36 Rust tests pass (2026-11-21). The three
-packaged-app checks (`check:ui` 18/18, `check:app` 10/10, `check:e2e` 12/12) last
-passed against the 1.0.2 build and were not re-run for 1.0.3. File associations for `.md` and `.markdown` are registered by the
-installer and verified by double-click and second-instance forwarding.
+Current state: 285 TypeScript tests and 36 Rust tests pass (2026-11-21), and all
+five packaged-app checks were re-run on this build: `check:menu` 3/3, `check:ui`
+18/18, `check:app` 10/10, `check:e2e` 18/18 and `check:security` 13/13. File
+associations for `.md` and `.markdown` are registered by the installer and
+verified by double-click and second-instance forwarding.
 
 1.0.3 changed the installer only: `src-tauri/nsis/hooks.nsh` now tells the shell
 the association changed, so an upgrade repaints Explorer's cached `.md` icon. No
@@ -133,6 +134,7 @@ checks for full coverage.
 | Export "Save as" dialog | Not automated. `buildStandaloneHtml` is covered by tests; the final dialog is not. |
 | Drag-and-drop from Explorer | Covered at the platform-interface level (fake platform) but not from a real Explorer drag. |
 | Signed installer | Not done: requires a code-signing certificate and `bundle.windows.signCommand`. Until then Windows shows an unknown-publisher warning. |
+| Native menu item invocation | `check:menu` reads the menu bar and the Edit submenu and checks the `Add Comment…` accelerator, but this session cannot deliver input to the window, so item *behaviour* is covered by `tests/integration/app.test.tsx` rather than end to end. |
 | Auto-update | Not implemented. Would need a release host and signing. |
 | `npm audit` | Clean as of 1.0.3 (checked 2026-11-21): an `overrides` entry pins the nested `katex` (pulled by `remark-math`) to the app's own patched version, which removed the duplicate entirely. Recheck after dependency updates. |
 
@@ -160,5 +162,5 @@ without agreeing to change the product.
 4. Only then consider the performance work in §2, with a measurement plan first.
 
 Every item above must leave `npm test`, `npm run test:rust`, `npm run typecheck`,
-`npm run lint` and `npm run build` green, and re-run `check:ui`, `check:app` and
-`check:e2e` before being called done.
+`npm run lint` and `npm run build` green, and re-run `check:menu`, `check:ui`,
+`check:app`, `check:e2e` and `check:security` before being called done.

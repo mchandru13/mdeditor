@@ -116,11 +116,11 @@ The workflow refuses to publish when the tag and the three version fields disagr
 | `npm run tauri:dev` | Desktop app with hot reload |
 | `npm run tauri:build` | Release build and installers |
 | `npm run bench` | Markdown pipeline benchmark (writes `bench/results.json`) |
-| `npm run check:ui` | Playwright smoke test against the production bundle (needs `npm run preview`) |
+| `npm run check:ui` | Playwright smoke test against the production bundle (needs `npm run preview` on :4173) |
 | `npm run check:app` | Playwright + CDP smoke test against the packaged desktop app |
-| `npm run check:menu` | Windows UI Automation check of the native menu bar |
-| `npm run check:e2e` | End-to-end run of the packaged app: open, edit, replace, save, external change, modes |
-| `npm run check:security` | Attacks the packaged app: navigation escape, remote-image beaconing, hostile Markdown |
+| `npm run check:menu` | Windows UI Automation check of the native menu bar and the Edit submenu |
+| `npm run check:e2e` | End-to-end run of the packaged app: open, edit, replace, save, external change, comment, undo, modes |
+| `npm run check:security` | Attacks the packaged app: navigation escape, remote-image beaconing, hostile Markdown, comment spoofing |
 
 ## Using the application
 
@@ -358,7 +358,7 @@ npm run check:security   # attack probes against the packaged app
 
 `check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, replace-all, the TOC, and zero page errors. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
 
-`check:e2e` drives the packaged application through a full editing session: it writes a temporary Markdown file, opens it with `--file`, renders it, types into the editor, replaces text through the find-and-replace UI, saves with Ctrl+S and verifies the bytes on disk, modifies the file from outside and confirms the reload, copies rendered HTML, and switches to Read Mode. Native dialogs (file picker, print, export destination) are the only part of the flow that cannot be automated.
+`check:e2e` drives the packaged application through a full editing session: it writes a temporary Markdown file, opens it with `--file`, renders it, types into the editor, replaces text through the find-and-replace UI, saves with Ctrl+S and verifies the bytes on disk, modifies the file from outside and confirms the reload, adds a comment with `Ctrl+Alt+M`, checks the annotation renders and reaches the file, undoes it with Ctrl+Z, copies rendered HTML, and switches to Read Mode. Native dialogs (file picker, print, export destination) are the only part of the flow that cannot be automated.
 
 `check:ui` needs Edge installed and a running preview server; `check:app`, `check:e2e` and `check:security` need a release build, and `check:app`/`check:security` need network access for the remote document and the remote image. `check:e2e` writes its document to a temporary directory, removes it afterwards, and closes the tab it opened so the restored session is left as it was.
 
@@ -381,7 +381,7 @@ npm run check:security   # attack probes against the packaged app
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
-Re-run for 1.0.3 on 2026-11-21 (Windows, Node 24.13.0): 213 Vitest tests at the time (the suite is 285 after the comment feature), 36 Rust tests, typecheck, lint, `check:ui` (18/18) and `npm audit` (0 vulnerabilities) all pass. `check:app` and `check:e2e` date from the 1.0.2 build and were not re-run for 1.0.3.
+Re-run for 1.0.3 on 2026-11-21 (Windows, Node 24.13.0): 285 Vitest tests, 36 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 3/3, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
 
 | Check | Command | Result |
 |---|---|---|
@@ -393,9 +393,9 @@ Re-run for 1.0.3 on 2026-11-21 (Windows, Node 24.13.0): 213 Vitest tests at the 
 | File association | double-click a `.md` in Explorer | launches the app with that file; second file forwards to the running window (verified: 1 process, tab added) |
 | Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
-| End-to-end session | `npm run check:e2e` | 12/12: open via `--file`, render, edit, replace, save to disk, external reload, copy HTML, mode switch; four consecutive clean runs |
-| Security check | `npm run check:security` | 9/9: Mermaid link cannot navigate the webview, remote images are not fetched until opt-in, hostile Markdown stays inert, the window still closes |
-| Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation). Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
+| End-to-end session | `npm run check:e2e` | 18/18: open via `--file`, render, edit, replace, save to disk, external reload, add a comment by keyboard, confirm it renders and is written to the file, undo it, copy HTML, mode switch |
+| Security check | `npm run check:security` | 13/13: Mermaid link cannot navigate the webview, remote images are not fetched until opt-in, hostile Markdown stays inert, only canonical comment blocks are tagged (a comment cannot hide real content or reach the outline), the window still closes |
+| Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation), the Edit submenu contains **Add Comment…**, and its native accelerator reads `Ctrl+Alt+M`. Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
 | Desktop release build | `npm run tauri:build` | passed; NSIS and MSI installers produced |
 | Packaged app boot | run `src-tauri/target/release/mdeditor.exe` | process stayed alive, React mounted, and `%APPDATA%\com.rea.mdeditor\settings.json` was written through IPC with the expected defaults |
 | Benchmark | `npm run bench` | see Performance: 200 KB in ~491 ms of pipeline time, 5 MB in ~24 s |

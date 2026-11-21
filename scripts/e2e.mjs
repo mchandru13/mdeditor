@@ -3,8 +3,8 @@
  *
  * Drives the real `mdeditor.exe` (real WebView2, real Rust IPC, real filesystem)
  * through a complete editing session: open a file from the command line, render
- * it, edit, replace, save to disk, react to an external modification, switch
- * modes and copy rendered HTML.
+ * it, edit, replace, save to disk, react to an external modification, add and
+ * undo a comment, switch modes and copy rendered HTML.
  *
  * Native dialogs (file picker, print, export target) cannot be automated from
  * this harness; everything else in the flow is exercised.
@@ -153,6 +153,81 @@ try {
     'read mode shows the reloaded document',
     (await page.locator('.markdown-body').first().innerText()).includes('Edited by another program.'),
   );
+
+  // --- comments ------------------------------------------------------------
+  await page.keyboard.press('Control+3');
+  await page.waitForSelector('.cm-editor', { timeout: 20000 });
+  await page.locator('.cm-content').click();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type('\n\nComment anchor paragraph.');
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.markdown-body')?.textContent?.includes('Comment anchor paragraph.') ??
+      false,
+    undefined,
+    { timeout: 10000 },
+  );
+
+  // Select that paragraph and add a comment from the keyboard, as a user would.
+  await page.keyboard.press('Shift+Home');
+  await page.keyboard.press('Control+Alt+KeyM');
+  await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
+  await page.locator('#comment-body').fill('Packaged comment check.');
+  await page.getByRole('button', { name: 'Add comment' }).click();
+
+  await page.waitForFunction(
+    () => document.querySelector('.cm-content')?.textContent?.includes('[!comment]') ?? false,
+    undefined,
+    { timeout: 10000 },
+  );
+  check('adds a comment to the source', true);
+
+  await page.waitForFunction(
+    () => document.querySelector('.markdown-body .mdeditor-comment') !== null,
+    undefined,
+    { timeout: 10000 },
+  );
+  check(
+    'preview renders the comment as an annotation',
+    (await page.locator('.markdown-body .mdeditor-comment').first().innerText()).includes(
+      'Packaged comment check.',
+    ),
+  );
+
+  await page.keyboard.press('Control+s');
+  await page.waitForFunction(() => document.querySelector('.tab-dirty') === null, undefined, {
+    timeout: 10000,
+  });
+  const savedWithComment = readFileSync(docPath, 'utf8');
+  check(
+    'comment is written into the file',
+    savedWithComment.includes('> [!comment]') &&
+      savedWithComment.includes('> Packaged comment check.'),
+  );
+
+  await page.keyboard.press('Control+z');
+  await page.waitForFunction(
+    () => !(document.querySelector('.cm-content')?.textContent?.includes('[!comment]') ?? true),
+    undefined,
+    { timeout: 10000 },
+  );
+  check('undo removes the comment from the source', true);
+
+  // The preview follows the source through a 150 ms debounce, so wait for it
+  // rather than sampling it on the next frame.
+  await page.waitForFunction(
+    () => document.querySelector('.markdown-body .mdeditor-comment') === null,
+    undefined,
+    { timeout: 10000 },
+  );
+  check('undo removes the annotation from the preview', true);
+
+  // Put the file back in sync with the buffer before the tab is closed.
+  await page.keyboard.press('Control+s');
+  await page.waitForFunction(() => document.querySelector('.tab-dirty') === null, undefined, {
+    timeout: 10000,
+  });
+  check('save after undo drops the comment', !readFileSync(docPath, 'utf8').includes('[!comment]'));
 
   // --- clean up this tab so the user's session is left tidy ---------------
   const previousMode = await page.evaluate(() => {

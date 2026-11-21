@@ -53,6 +53,75 @@ try {
     $results.Add("FAIL  missing menus: $($missing -join ', ')")
   }
 
+  # The Edit submenu is where a new command can silently fail to appear. Expand
+  # it through UI Automation (no input delivery needed) and check the item and
+  # its accelerator, so a menu regression is caught by this check rather than by
+  # a user noticing the command is gone.
+  $editItem = $null
+  foreach ($bar in $bars) {
+    $children = $bar.FindAll(
+      [System.Windows.Automation.TreeScope]::Children,
+      [System.Windows.Automation.Condition]::TrueCondition)
+    foreach ($child in $children) {
+      if ($child.Current.Name -eq 'Edit') { $editItem = $child; break }
+    }
+    if ($editItem) { break }
+  }
+
+  $editNames = @()
+  $addComment = $null
+  if ($editItem) {
+    $expanded = $false
+    try {
+      $pattern = $editItem.GetCurrentPattern(
+        [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+      $pattern.Expand()
+      $expanded = $true
+      Start-Sleep -Milliseconds 700
+
+      $menuItemCondition = New-Object System.Windows.Automation.PropertyCondition(
+        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [System.Windows.Automation.ControlType]::MenuItem)
+      $items = $editItem.FindAll(
+        [System.Windows.Automation.TreeScope]::Descendants, $menuItemCondition)
+      foreach ($item in $items) {
+        $editNames += $item.Current.Name
+        if (-not $addComment -and $item.Current.Name -like 'Add Comment*') {
+          $addComment = $item
+        }
+      }
+    }
+    catch {
+      $editNames = @()
+    }
+    finally {
+      if ($expanded) {
+        try { $pattern.Collapse() } catch { }
+      }
+    }
+  }
+
+  if ($editNames.Count -gt 0) {
+    $results.Add("INFO  Edit items: $($editNames -join ', ')")
+  }
+
+  if ($addComment) {
+    $results.Add('PASS  Edit menu contains Add Comment')
+    $accelerator = $addComment.Current.AcceleratorKey
+    if ($accelerator -match 'Ctrl\+Alt\+M') {
+      $results.Add("PASS  Add Comment accelerator is $accelerator")
+    }
+    else {
+      $results.Add("FAIL  Add Comment accelerator is '$accelerator', expected Ctrl+Alt+M")
+    }
+  }
+  elseif ($editNames.Count -eq 0) {
+    $results.Add('SKIP  could not enumerate the Edit submenu from this session')
+  }
+  else {
+    $results.Add("FAIL  Edit menu lacks Add Comment (saw: $($editNames -join ', '))")
+  }
+
   $results.Add('SKIP  item invocation: this session cannot deliver input to the window')
 }
 catch {

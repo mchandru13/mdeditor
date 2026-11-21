@@ -159,6 +159,70 @@ check(
   JSON.stringify(hostileState),
 );
 
+// ---- 2b. a comment cannot hide document content -----------------------------
+// The comment feature exempts a block from statistics, search and exported HTML.
+// That is only safe if the block really is a comment, so probe the shapes that
+// look similar: a marker only, a marker whose body is a heading, a marker
+// followed by a list, and a soft-wrapped marker (which is quoted prose).
+const COMMENT_CASES = join(TMP, 'comment-cases.md');
+writeFileSync(
+  COMMENT_CASES,
+  [
+    'Visible prose paragraph.',
+    '',
+    '> [!comment] chand',
+    '>',
+    '> Editorial note. <script>window.__pwned=6</script>',
+    '',
+    '> [!comment] x',
+    '>',
+    '> # Heading inside a comment',
+    '',
+    '> [!comment] soft wrap',
+    '> quoted prose that must stay in the export',
+    '',
+    '> [!comment] x',
+    '> - list item that must stay',
+    '',
+  ].join('\n'),
+);
+spawn(EXE, ['--file', COMMENT_CASES], { stdio: 'ignore' });
+await sleep(9000);
+
+const commentState = await page.evaluate(() => {
+  const body = document.querySelector('.markdown-body');
+  return {
+    pwned: window.__pwned ?? null,
+    scripts: body?.querySelectorAll('script').length ?? -1,
+    // Two canonical blocks in the fixture: the note, and the heading below its
+    // own `>` separator line.
+    comments: body?.querySelectorAll('.mdeditor-comment').length ?? -1,
+    // A heading inside a comment is editorial: it must not get an anchor id and
+    // so cannot appear in the table of contents.
+    commentHeadingId: body?.querySelector('.mdeditor-comment h1')?.id ?? '',
+    // Text that is not a canonical comment must survive.
+    keptProse: body?.textContent?.includes('quoted prose that must stay in the export') ?? false,
+    keptItem: body?.textContent?.includes('list item that must stay') ?? false,
+    noteVisible: body?.textContent?.includes('Editorial note.') ?? false,
+  };
+});
+check(
+  'tags exactly the canonical comment blocks',
+  commentState.comments === 2,
+  JSON.stringify(commentState),
+);
+check(
+  'a heading inside a comment cannot reach the outline',
+  commentState.commentHeadingId === '',
+  JSON.stringify(commentState),
+);
+check('comment syntax cannot execute script', commentState.pwned === null && commentState.scripts === 0, JSON.stringify(commentState));
+check(
+  'non-comment content is never hidden',
+  commentState.keptProse && commentState.keptItem && commentState.noteVisible,
+  JSON.stringify(commentState),
+);
+
 // ---- 3. remote images blocked, then opt-in -----------------------------------
 externalRequests.length = 0;
 // Open through the app's own file command path: reuse the dialog-free route by
