@@ -36,6 +36,8 @@ export interface FakePlatform extends Platform {
   /** Simulates another program rewriting a file: content changes and mtime bumps. */
   writeExternally(path: string, content: string): void;
   closeRequests: number;
+  /** Number of times the app asked the platform to print. */
+  printRequests: number;
   assetOriginValue: string | null;
 }
 
@@ -181,7 +183,7 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
     },
 
     print() {
-      return undefined;
+      platform.printRequests += 1;
     },
 
     dragDrop(paths) {
@@ -206,6 +208,7 @@ export function createFakePlatform(options: FakePlatformOptions = {}): FakePlatf
     },
 
     closeRequests: 0,
+    printRequests: 0,
   };
 
   return platform;

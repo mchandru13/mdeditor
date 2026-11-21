@@ -4,6 +4,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 
 import { createFakePlatform } from '../../src/platform/fake';
 
+const { editorCalls } = vi.hoisted(() => ({ editorCalls: [] as string[] }));
+
 vi.mock('../../src/components/Editor/Editor', () => {
   const MockEditor = forwardRef(function MockEditor(
     {
@@ -36,8 +38,12 @@ vi.mock('../../src/components/Editor/Editor', () => {
       restoreScroll: () => undefined,
       lineAtScrollTop: () => 1,
       scrollToLine: () => undefined,
-      undo: () => undefined,
-      redo: () => undefined,
+      undo: () => {
+        editorCalls.push('undo');
+      },
+      redo: () => {
+        editorCalls.push('redo');
+      },
     }));
 
     return (
@@ -948,5 +954,232 @@ describe('accessibility', () => {  it('exposes named controls and a tablist', as
     await waitFor(() => {
       expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
     });
+  });
+});
+
+/**
+ * One test per native menu id. `src-tauri/src/menu.rs` and the switch in
+ * `App.tsx` are checked for having the same 25 ids, but nothing proved that
+ * dispatching them does anything: a menu item wired to a missing case is a
+ * button that silently does nothing. These tests fail if any id stops having an
+ * observable effect, and each group names the id it dispatches.
+ *
+ * Cut / Copy / Paste / Select All are OS predefined items, not app commands, so
+ * they have no id here; they act on whatever has focus and are covered by
+ * CodeMirror and the WebView's own editing behaviour.
+ */
+describe('every native menu command has an observable effect', () => {
+  async function openInEditMode(markdown: string) {
+    const result = await openFromClipboard(markdown);
+    await screen.findByLabelText('Markdown source editor');
+    return result;
+  }
+
+  async function openInReadMode(markdown: string) {
+    const result = renderApp({ clipboard: markdown }, 'read');
+    fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
+    await screen.findByRole('tab', { name: /Pasted document/ });
+    return result;
+  }
+
+  it('file.new creates a document and file.open opens the configured path', async () => {
+    const { platform } = renderApp({
+      openPath: 'C:\\docs\\opened.md',
+      files: { 'C:\\docs\\opened.md': '# Opened\n' },
+    });
+    await act(async () => {
+      platform.emitMenu('file.new');
+    });
+    expect(await screen.findByRole('tab', { name: /Untitled/ })).toBeInTheDocument();
+
+    await act(async () => {
+      platform.emitMenu('file.open');
+    });
+    expect(await screen.findByRole('tab', { name: /opened\.md/ })).toBeInTheDocument();
+  });
+
+  it('file.openUrl opens the URL dialog', async () => {
+    const { platform } = renderApp();
+    await act(async () => {
+      platform.emitMenu('file.openUrl');
+    });
+    expect(await screen.findByRole('dialog', { name: 'Open Markdown from URL' })).toBeInTheDocument();
+  });
+
+  it('file.clipboard creates a document from the clipboard', async () => {
+    const { platform } = renderApp({ clipboard: '# From clipboard\n' });
+    await act(async () => {
+      platform.emitMenu('file.clipboard');
+    });
+    expect(await screen.findByRole('tab', { name: /From clipboard|Pasted document/ })).toBeInTheDocument();
+  });
+
+  it('file.save and file.saveAs write to disk', async () => {
+    const { platform } = renderApp({
+      clipboard: '# saved\n',
+      savePath: 'C:\\out\\as.md',
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
+    await screen.findByRole('tab', { name: /Pasted document/ });
+
+    // A pasted document has no path, so plain Save routes through Save As.
+    await act(async () => {
+      platform.emitMenu('file.save');
+    });
+    await waitFor(() => expect(platform.files.get('C:\\out\\as.md')).toContain('# saved'));
+
+    await act(async () => {
+      platform.emitMenu('file.saveAs');
+    });
+    await waitFor(() => expect(platform.files.get('C:\\out\\as.md')).toContain('# saved'));
+  });
+
+  it('file.exportHtml writes a standalone document', async () => {
+    const { platform } = renderApp(
+      {
+        files: { 'C:\\docs\\export.md': '# Export me\n\nbody\n' },
+        savePath: 'C:\\out\\export.html',
+      },
+      'read',
+    );
+    await act(async () => {
+      platform.dragDrop(['C:\\docs\\export.md']);
+    });
+    await screen.findByRole('tab', { name: /export\.md/ });
+    // Export builds its tree from the live render, so the document has to be
+    // rendered first. Read Mode is the realistic path and has no editor.
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Export me' })).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      platform.emitMenu('file.exportHtml');
+    });
+    await waitFor(() => expect(platform.files.get('C:\\out\\export.html')).toContain('Export me'));
+  });
+
+  it('file.print asks the platform to print, and file.exit closes the window', async () => {
+    const { platform } = renderApp();
+    await act(async () => {
+      platform.emitMenu('file.print');
+    });
+    expect(platform.printRequests).toBe(1);
+
+    await act(async () => {
+      platform.emitMenu('file.exit');
+    });
+    await waitFor(() => expect(platform.closeRequests).toBe(1));
+  });
+
+  it('edit.undo and edit.redo reach the editor', async () => {
+    const { platform } = await openInEditMode('text\n');
+    editorCalls.length = 0;
+
+    await act(async () => {
+      platform.emitMenu('edit.undo');
+    });
+    await act(async () => {
+      platform.emitMenu('edit.redo');
+    });
+    expect(editorCalls).toEqual(['undo', 'redo']);
+  });
+
+  it('edit.find and edit.replace open search with the right row', async () => {
+    const { platform } = await openInEditMode('needle\n');
+
+    await act(async () => {
+      platform.emitMenu('edit.find');
+    });
+    expect(await screen.findByLabelText('Search text')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Replace with')).toBeNull();
+
+    await act(async () => {
+      platform.emitMenu('edit.replace');
+    });
+    expect(await screen.findByLabelText('Replace with')).toBeInTheDocument();
+  });
+
+  it('edit.comment opens the comment dialog', async () => {
+    const { platform } = await openInEditMode('text to annotate\n');
+    await act(async () => {
+      platform.emitMenu('edit.comment');
+    });
+    expect(await screen.findByRole('dialog', { name: 'Add comment' })).toBeInTheDocument();
+  });
+
+  it('view.read, view.edit and view.split change the mode', async () => {
+    const { platform } = await openInEditMode('# text\n');
+
+    for (const [id, label] of [
+      ['view.read', 'Read'],
+      ['view.edit', 'Edit'],
+      ['view.split', 'Split'],
+    ] as const) {
+      await act(async () => {
+        platform.emitMenu(id);
+      });
+      await waitFor(() => {
+        const radio = screen.getAllByRole('radio').find((entry) => entry.textContent === label);
+        expect(radio).toHaveAttribute('aria-checked', 'true');
+      });
+    }
+  });
+
+  it('view.toc shows and hides the contents sidebar', async () => {
+    const { platform } = await openInReadMode('# One\n\n## Two\n');
+    expect(await screen.findByRole('navigation', { name: 'Table of contents' })).toBeInTheDocument();
+
+    await act(async () => {
+      platform.emitMenu('view.toc');
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('navigation', { name: 'Table of contents' })).toBeNull();
+    });
+  });
+
+  it('view.syncScroll toggles the toolbar state', async () => {
+    const { platform } = await openInEditMode('text\n');
+    const button = screen.getByRole('button', { name: 'Sync scroll' });
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+
+    await act(async () => {
+      platform.emitMenu('view.syncScroll');
+    });
+    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'false'));
+  });
+
+  it('view.theme.light, .dark and .system change the document theme', async () => {
+    const { platform } = await openInEditMode('text\n');
+
+    for (const [id, theme] of [
+      ['view.theme.dark', 'dark'],
+      ['view.theme.light', 'light'],
+    ] as const) {
+      await act(async () => {
+        platform.emitMenu(id);
+      });
+      await waitFor(() => expect(document.documentElement.dataset.theme).toBe(theme));
+    }
+
+    await act(async () => {
+      platform.emitMenu('view.theme.system');
+    });
+    // System resolves against matchMedia, which jsdom reports as light.
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'));
+  });
+
+  it('help.shortcuts and help.about open their dialogs', async () => {
+    const { platform } = renderApp();
+
+    await act(async () => {
+      platform.emitMenu('help.shortcuts');
+    });
+    expect(await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    await act(async () => {
+      platform.emitMenu('help.about');
+    });
+    expect(await screen.findByRole('dialog', { name: 'About Markdown Editor' })).toBeInTheDocument();
   });
 });
