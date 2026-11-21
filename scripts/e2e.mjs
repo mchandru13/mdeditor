@@ -18,7 +18,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium } from 'playwright-core';
 
-const EXE = resolve('src-tauri/target/release/mdeditor.exe');
+// Defaults to the build in this checkout; set MDEDITOR_EXE to test the
+// installed copy, which is what a user actually runs.
+const EXE = resolve(process.env.MDEDITOR_EXE ?? 'src-tauri/target/release/mdeditor.exe');
 const PORT = 9223;
 
 const workDir = mkdtempSync(join(tmpdir(), 'mdeditor-e2e-'));

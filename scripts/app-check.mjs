@@ -12,7 +12,8 @@ import { chromium } from 'playwright-core';
 
 const URL_TO_OPEN =
   process.argv[2] ?? 'https://raw.githubusercontent.com/rust-lang/rust/master/README.md';
-const EXE = 'src-tauri/target/release/mdeditor.exe';
+// Set MDEDITOR_EXE to test an installed copy instead of the local build.
+const EXE = process.env.MDEDITOR_EXE ?? 'src-tauri/target/release/mdeditor.exe';
 const PORT = 9222;
 
 process.env.WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = `--remote-debugging-port=${PORT}`;

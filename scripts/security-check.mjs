@@ -16,7 +16,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const EXE = process.argv[2] ?? join('src-tauri', 'target', 'release', 'mdeditor.exe');
+const EXE = process.argv[2] ?? process.env.MDEDITOR_EXE ?? join('src-tauri', 'target', 'release', 'mdeditor.exe');
 const PORT = 9360;
 const SETTINGS = join(process.env.APPDATA, 'com.rea.mdeditor', 'settings.json');
 const BACKUP = join(process.env.TEMP, 'settings.sec-backup.json');

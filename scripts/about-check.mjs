@@ -10,7 +10,7 @@ import { chromium } from 'playwright-core';
  * runs — no OS input required. Covers the About box version and the comment
  * entry in the shortcut list.
  */
-const EXE = resolve('src-tauri/target/release/mdeditor.exe');
+const EXE = resolve(process.env.MDEDITOR_EXE ?? 'src-tauri/target/release/mdeditor.exe');
 const PORT = 9341;
 const child = spawn(EXE, [], {
   env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}` },
@@ -50,13 +50,25 @@ try {
       return 'ok';
     }, id);
 
-  const about = await emit('help.about');
-  // The window emits before React commits the dialog; poll instead of assuming.
-  await page
-    .waitForFunction(() => document.querySelector('[role="dialog"]') !== null, undefined, {
-      timeout: 5000,
-    })
-    .catch(() => undefined);
+  // The frontend subscribes to the menu channel on mount, so an emit sent during
+  // startup is dropped. Retry until the dialog appears rather than assuming.
+  const openDialog = async (id, name) => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await emit(id);
+      const opened = await page
+        .waitForFunction(
+          (wanted) => document.querySelector('[role="dialog"]')?.textContent?.includes(wanted) ?? false,
+          name,
+          { timeout: 1000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      if (opened) return true;
+    }
+    return false;
+  };
+
+  const about = await openDialog('help.about', 'About Markdown Editor');
   const aboutText = await page.evaluate(() => {
     const dialog = document.querySelector('[role="dialog"]');
     return {
@@ -64,7 +76,7 @@ try {
       text: dialog?.textContent ?? '',
     };
   });
-  check('Help > About opens', aboutText.open, `emit=${about}`);
+  check('Help > About opens', aboutText.open, `opened=${about}`);
   check(
     'About shows the shipped version, not a stale literal',
     /Markdown Editor\s+1\.1\.0/.test(aboutText.text) && !/1\.0\.0/.test(aboutText.text),
@@ -79,13 +91,10 @@ try {
   });
   await sleep(500);
 
-  await emit('help.shortcuts');
-  await page
-    .waitForSelector('[role="dialog"]', { timeout: 5000 })
-    .catch(() => undefined);
-  const shortcutText = await page.evaluate(
-    () => document.querySelector('[role="dialog"]')?.textContent ?? '',
-  );
+  const shortcutsOpened = await openDialog('help.shortcuts', 'Keyboard shortcuts');
+  const shortcutText = shortcutsOpened
+    ? await page.evaluate(() => document.querySelector('[role="dialog"]')?.textContent ?? '')
+    : '';
   check(
     'shortcut list documents Ctrl+Alt+M',
     /Ctrl\+Alt\+M/.test(shortcutText) && /Add a comment/.test(shortcutText),
