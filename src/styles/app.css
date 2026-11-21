@@ -644,3 +644,35 @@ mark.search-hit-active {
 .remote-images p {
   margin: 0;
 }
+
+/* Right-click menu for the rendered document. It is positioned from the click
+   coordinates, so it must not participate in layout. */
+.context-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 180px;
+  padding: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
+  background: var(--bg-inset);
+}

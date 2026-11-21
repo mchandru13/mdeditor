@@ -11,6 +11,7 @@ import { Toc } from './components/Toc/Toc';
 import { StatusBar } from './components/Toolbar/StatusBar';
 import { Toolbar } from './components/Toolbar/Toolbar';
 import { MarkdownView } from './components/Viewer/MarkdownView';
+import { SelectionContextMenu } from './components/Viewer/SelectionContextMenu';
 import { Viewer, type ViewerHandle } from './components/Viewer/Viewer';
 import { WorkspaceModeSelector } from './components/WorkspaceModeSelector/WorkspaceModeSelector';
 import { useDocumentRender, resourceBaseFor } from './hooks/useDocumentRender';
@@ -602,6 +603,45 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   /* ---------------------------------------------------------------- comments */
 
   /**
+   * Maps a DOM selection in the preview back to source offsets.
+   *
+   * Read and Split users select text in the rendered document, not in the
+   * source. The offsets still have to be source offsets, so the selected text is
+   * located in the document source: first as an exact substring, otherwise by
+   * its first and last words (the rendered text differs from the source in
+   * whitespace and inline markup). Returns null when the selection is not text
+   * that occurs in the document, so nothing is ever anchored by guesswork.
+   */
+  const sourceRangeForDomSelection = useCallback((): { from: number; to: number } | null => {
+    const current = activeDocument(stateRef.current);
+    const body = viewerElementRef.current?.querySelector('.markdown-body');
+    if (!current || !body) return null;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+    const range = selection.getRangeAt(0);
+    if (!body.contains(range.commonAncestorContainer)) return null;
+
+    const text = selection.toString().replace(/\s+/g, ' ').trim();
+    if (!text) return null;
+
+    const exact = current.source.indexOf(text);
+    if (exact !== -1) return { from: exact, to: exact + text.length };
+
+    // Rendered text and source differ where inline markup or wrapping is
+    // involved, so fall back to the first and last word of the selection.
+    const words = text.split(' ').filter(Boolean);
+    const first = words[0] ?? '';
+    const last = words[words.length - 1] ?? '';
+    if (!first || !last) return null;
+    const start = current.source.indexOf(first);
+    if (start === -1) return null;
+    const end = current.source.indexOf(last, start);
+    if (end === -1) return null;
+    return { from: start, to: end + last.length };
+  }, []);
+
+  /**
    * Opens the comment dialog for the current selection.
    *
    * Comments are anchored to top-level blocks only: a blockquote placed after a
@@ -614,29 +654,26 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     // it is a dependency of the native-menu effect, and rebuilding that effect
     // on every keystroke leaks a menu subscription per edit.
     const current = activeDocument(stateRef.current);
-    if (!current) return;
-    if (mode === 'read') {
-      setMessage('Switch to Edit or Split mode to add a comment.');
+    if (!current) {
+      setMessage('Open a document before adding a comment.');
       return;
     }
 
-    // Without a mounted editor there is no selection to read; inventing offsets
-    // would anchor the comment to the document start instead of the user's text.
-    const editor = editorRef.current;
-    const selection = editor?.getSelection() ?? null;
-    if (!editor || !selection) {
-      setMessage('The editor is not ready yet. Try again in a moment.');
-      return;
-    }
+    // Edit Mode selection first, then the preview. In Read Mode the editor does
+    // not exist at all, so requiring one made the command dead there; and in
+    // Edit Mode the lazy editor chunk can be in flight, which is not a reason to
+    // refuse a selection the user can see.
+    const editorSelection = editorRef.current?.getSelection() ?? null;
+    const fromEditor =
+      editorSelection && editorSelection.from !== editorSelection.to ? editorSelection : null;
+    const selection = fromEditor ?? sourceRangeForDomSelection();
 
-    // The editor is the only source of truth. `window.getSelection()` is not
-    // usable here: CodeMirror draws its own selection (drawSelection), so the
-    // DOM range can still point at the preview from an earlier click while the
-    // editor holds a perfectly good selection — a guard on it refused real
-    // selections. Requiring a non-empty editor selection instead is
-    // deterministic: a comment annotates text, so there must be some.
-    if (selection.from === selection.to) {
-      setMessage('Select the text to comment on first, then press Ctrl+Alt+M.');
+    if (!selection) {
+      setMessage(
+        mode === 'read'
+          ? 'Select text in the document first, then press Ctrl+Alt+M.'
+          : 'Select the text to comment on first, then press Ctrl+Alt+M.',
+      );
       return;
     }
 
@@ -652,7 +689,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
       to: selection.to,
       target: anchorLabel(current.source, point.anchorEnd),
     });
-  }, [mode]);
+  }, [mode, sourceRangeForDomSelection]);
 
   const submitComment = useCallback(
     (comment: { header: string; body: string }) => {
@@ -1123,6 +1160,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
           {doc ? (
           <section className="panes" style={gridStyle}>
+            <SelectionContextMenu scope={viewerElementRef.current} onAddComment={startComment} />
             {mode !== 'read' ? (
               <div className="pane pane-editor">
                 <Editor

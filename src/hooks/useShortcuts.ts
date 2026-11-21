@@ -18,7 +18,13 @@ export type ShortcutHandlers = Partial<Record<ShortcutName, () => void>>;
 
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
-function shortcutFor(event: KeyboardEvent): ShortcutName | null {
+/**
+ * Maps a key event to a shortcut name, or null.
+ *
+ * Exported so the mapping can be tested without a window: the Ctrl+Alt+M guard
+ * was silently rejecting the key on whole keyboard layouts.
+ */
+export function shortcutForEvent(event: KeyboardEvent): ShortcutName | null {
   const mod = IS_MAC ? event.metaKey : event.ctrlKey;
   const key = event.key.toLowerCase();
 
@@ -32,12 +38,15 @@ function shortcutFor(event: KeyboardEvent): ShortcutName | null {
   if (key === '3') return 'mod+3';
   if (key === 'f') return 'mod+f';
   if (key === 'h') return 'mod+h';
-  // AltGr reports as Ctrl+Alt on Windows; on layouts where it produces a letter
-  // that letter is text, not a shortcut.
-  if (key === 'm' && event.altKey && !event.shiftKey) {
-    if (event.getModifierState?.('AltGraph')) return null;
-    return 'mod+alt+m';
-  }
+  // Ctrl+Alt+M (the accelerator the menu advertises).
+  //
+  // This deliberately does not bail out on `getModifierState('AltGraph')`. On
+  // layouts where Ctrl+Alt reports as AltGr, that flag made the shortcut a no-op
+  // for the whole machine — the user pressed the documented key and nothing
+  // happened at all. The cost is that on such a layout AltGr+M types its
+  // character into the editor instead of opening the dialog, which is one rare
+  // keystroke against a documented command that never fired.
+  if (key === 'm' && event.altKey && !event.shiftKey) return 'mod+alt+m';
   if (key === 'o') return 'mod+o';
   if (key === 'w') return 'mod+w';
   if (key === 's') return event.shiftKey ? 'mod+shift+s' : 'mod+s';
@@ -60,7 +69,7 @@ export function useShortcuts(handlers: ShortcutHandlers, enabled = true): void {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
 
-      const name = shortcutFor(event);
+      const name = shortcutForEvent(event);
       if (!name) return;
 
       const handler = handlers[name];

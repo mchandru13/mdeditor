@@ -456,17 +456,24 @@ describe('menu commands', () => {
     });
   });
 
-  it('refuses to comment in Read Mode', async () => {
+  it('comments in Read Mode when text is selected, and asks otherwise', async () => {
     const { platform } = await openFromClipboard('# Read only\n');
 
     await act(async () => {
       platform.emitMenu('view.read');
     });
+
+    // Read Mode mounts no editor, so this used to be refused outright. A
+    // selection in the preview is now a valid anchor; with nothing selected the
+    // command asks for one. Previously this expected "Switch to Edit or Split
+    // mode", which was the behaviour that made the command dead in Read Mode.
     await act(async () => {
       platform.emitMenu('edit.comment');
     });
-
-    expect(await screen.findByText(/Switch to Edit or Split mode/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Select text in the document first/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('shows the shortcut reference and About box from Help', async () => {
