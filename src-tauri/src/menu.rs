@@ -45,7 +45,10 @@ pub const COMMANDS: &[Command] = &[
     Command { id: "edit.redo", label: "Redo", accelerator: Some("CmdOrCtrl+Y") },
     Command { id: "edit.find", label: "Find…", accelerator: Some("CmdOrCtrl+F") },
     Command { id: "edit.replace", label: "Replace…", accelerator: Some("CmdOrCtrl+H") },
-    Command { id: "edit.comment", label: "Add Comment…", accelerator: Some("CmdOrCtrl+Alt+M") },
+    Command { id: "edit.comment", label: "Add Comment…", accelerator: Some("CmdOrCtrl+Shift+M") },
+    Command { id: "edit.comment.edit", label: "Edit Comment…", accelerator: None },
+    Command { id: "edit.comment.remove", label: "Remove Comment", accelerator: None },
+    Command { id: "edit.comment.removeAll", label: "Remove All Comments", accelerator: None },
     Command { id: "view.theme.light", label: "Light", accelerator: None },
     Command { id: "view.theme.dark", label: "Dark", accelerator: None },
     Command { id: "view.theme.system", label: "System", accelerator: None },
@@ -107,18 +110,18 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     edit_items.push(Box::new(PredefinedMenuItem::separator(app)?));
     edit_items.extend(items(app, &[&COMMANDS[14..16]])?);
     edit_items.push(Box::new(PredefinedMenuItem::separator(app)?));
-    edit_items.extend(items(app, &[&COMMANDS[16..17]])?);
+    edit_items.extend(items(app, &[&COMMANDS[16..20]])?);
     let edit = Submenu::with_items(app, "Edit", true, &refs(&edit_items))?;
 
-    let theme_items = items(app, &[&COMMANDS[17..20]])?;
+    let theme_items = items(app, &[&COMMANDS[20..23]])?;
     let theme = Submenu::with_items(app, "Theme", true, &refs(&theme_items))?;
 
-    let mut view_items = items(app, &[&COMMANDS[20..26]])?;
+    let mut view_items = items(app, &[&COMMANDS[23..29]])?;
     view_items.push(Box::new(PredefinedMenuItem::separator(app)?));
     view_items.push(Box::new(theme));
     let view = Submenu::with_items(app, "View", true, &refs(&view_items))?;
 
-    let help_items = items(app, &[&COMMANDS[26..28]])?;
+    let help_items = items(app, &[&COMMANDS[29..31]])?;
     let help = Submenu::with_items(app, "Help", true, &refs(&help_items))?;
 
     Menu::with_items(app, &[&file, &edit, &view, &help])
@@ -158,10 +161,13 @@ mod tests {
             .find(|command| command.id == "edit.comment")
             .expect("edit.comment is declared");
         assert_eq!(comment.label, "Add Comment…");
+        // Ctrl+Shift+M, not Ctrl+Alt+M: on layouts where Ctrl+Alt is AltGr the
+        // OS turns Ctrl+Alt+M into a character ("ṁ" was observed), so it never
+        // reaches either the accelerator or the webview handler.
         assert_eq!(
             comment.accelerator,
-            Some("CmdOrCtrl+Alt+M"),
-            "without the native accelerator Ctrl+Alt+M only works inside the webview"
+            Some("CmdOrCtrl+Shift+M"),
+            "the accelerator must avoid AltGr combinations"
         );
     }
 }

@@ -48,8 +48,10 @@ describe('native menu wiring', () => {
 
   it('registers the comment command with its accelerator', () => {
     expect(menuIds()).toContain('edit.comment');
+    // Ctrl+Shift+M, not Ctrl+Alt+M: the latter is AltGr on some layouts and
+    // arrives as a plain character, so it can never be an accelerator there.
     expect(menuSource).toMatch(
-      /id:\s*"edit\.comment",\s*label:\s*"Add Comment…",\s*accelerator:\s*Some\("CmdOrCtrl\+Alt\+M"\)/,
+      /id:\s*"edit\.comment",\s*label:\s*"Add Comment…",\s*accelerator:\s*Some\("CmdOrCtrl\+Shift\+M"\)/,
     );
   });
 

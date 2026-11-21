@@ -12,15 +12,20 @@ interface CommentDialogProps {
   onSubmit: (comment: { header: string; body: string }) => void;
   /** Where the comment will be attached, shown so the target is unambiguous. */
   target: string;
+  /** Present when editing an existing comment rather than adding one. */
+  existing?: { header: string; body: string };
+  /** Present when the dialog can delete the comment it is editing. */
+  onRemove?: () => void;
 }
 
 /**
- * Modal for adding a comment. Mirrors `UrlDialog`'s focus trap and Escape
- * handling so the two dialogs cannot drift apart.
+ * Modal for adding or editing a comment. Mirrors `UrlDialog`'s focus trap and
+ * Escape handling so the two dialogs cannot drift apart.
  */
-export function CommentDialog({ onCancel, onSubmit, target }: CommentDialogProps) {
-  const [header, setHeader] = useState('');
-  const [body, setBody] = useState('');
+export function CommentDialog({ onCancel, onSubmit, target, existing, onRemove }: CommentDialogProps) {
+  const editing = existing !== undefined;
+  const [header, setHeader] = useState(existing?.header ?? '');
+  const [body, setBody] = useState(existing?.body ?? '');
   const [localError, setLocalError] = useState<string | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -90,7 +95,7 @@ export function CommentDialog({ onCancel, onSubmit, target }: CommentDialogProps
         aria-describedby={hintId}
         ref={dialogRef}
       >
-        <h2 id={titleId}>Add comment</h2>
+        <h2 id={titleId}>{editing ? 'Edit comment' : 'Add comment'}</h2>
         <p className="modal-hint" id={hintId}>
           The comment is written into the document as a Markdown blockquote, so it
           travels with the file and any assistant reading it sees your note next to
@@ -137,11 +142,16 @@ export function CommentDialog({ onCancel, onSubmit, target }: CommentDialogProps
           ) : null}
 
           <div className="modal-actions">
+            {onRemove ? (
+              <button type="button" className="button ghost danger" onClick={onRemove}>
+                Remove comment
+              </button>
+            ) : null}
             <button type="button" className="button ghost" onClick={() => cancelRef.current()}>
               Cancel
             </button>
             <button type="submit" className="button primary">
-              Add comment
+              {editing ? 'Save comment' : 'Add comment'}
             </button>
           </div>
         </form>

@@ -129,11 +129,11 @@ try {
   if ($addComment) {
     $results.Add('PASS  Edit menu contains Add Comment')
     $accelerator = $addComment.Current.AcceleratorKey
-    if ($accelerator -match 'Ctrl\+Alt\+M') {
+    if ($accelerator -match 'Ctrl\+Shift\+M') {
       $results.Add("PASS  Add Comment accelerator is $accelerator")
     }
     else {
-      $results.Add("FAIL  Add Comment accelerator is '$accelerator', expected Ctrl+Alt+M")
+      $results.Add("FAIL  Add Comment accelerator is '$accelerator', expected Ctrl+Shift+M")
     }
   }
   elseif ($editNames.Count -eq 0) {

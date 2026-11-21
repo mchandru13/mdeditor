@@ -84,7 +84,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 318 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
+| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 329 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
 | `Release` | a `v*` tag, or manual dispatch | builds the NSIS and MSI installers; on a tag, publishes them as a GitHub Release with checksums |
 
 A manual `Release` run builds the installers and keeps them as workflow artifacts without publishing, which is the way to test packaging changes.
@@ -131,7 +131,7 @@ A native Windows menu bar exposes every action and its accelerator:
 | Menu | Items |
 |---|---|
 | File | New (Ctrl+N), Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, Print… (Ctrl+P), Exit |
-| Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F), Replace… (Ctrl+H), Add Comment… (Ctrl+Alt+M) |
+| Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F), Replace… (Ctrl+H), Add Comment… (Ctrl+Shift+M), Edit Comment…, Remove Comment, Remove All Comments |
 | View | Read Mode (Ctrl+1), Edit Mode (Ctrl+2), Split Mode (Ctrl+3), Toggle Contents, Toggle Sync Scroll, Toggle Spell Check, Theme ▸ Light / Dark / System |
 | Help | Keyboard Shortcuts, About Markdown Editor |
 
@@ -186,7 +186,7 @@ Switching modes never reloads from disk, never discards edits and never creates 
 | Ctrl+1 / Ctrl+2 / Ctrl+3 | Read / Edit / Split |
 | Ctrl+F | Search in the current document |
 | Ctrl+H | Find and replace |
-| Ctrl+Alt+M | Add a comment to the selected text |
+| Ctrl+Shift+M | Add a comment to the selected text |
 | Enter / Shift+Enter | Next / previous match (while search is open) |
 | Ctrl+S | Save |
 | Ctrl+Shift+S | Save As |
@@ -217,7 +217,7 @@ The cache is invalidated on write.
 ```
 
 Select text in Edit or Split Mode and choose **Edit → Add Comment…**
-(Ctrl+Alt+M). The comment is inserted immediately after the selected paragraph,
+(Ctrl+Shift+M). The comment is inserted immediately after the selected paragraph,
 and a blank line separates it from what follows.
 
 - The marker must own its paragraph, so `> [!comment] header` is followed by a
@@ -227,7 +227,7 @@ and a blank line separates it from what follows.
   blockquote or code block are refused with a message rather than mis-anchored to
   something the user did not select.
 - Select the text you want to annotate, then use any of three entry points:
-  **Edit → Add Comment…**, **Ctrl+Alt+M**, or right-clicking the selection and
+  **Edit → Add Comment…**, **Ctrl+Shift+M**, or right-clicking the selection and
   choosing **Add Comment…**. A selection works in **Read Mode** too, where no
   editor is mounted: the selected text is matched back to the document source.
   With nothing selected the command asks for a selection instead of guessing a
@@ -235,6 +235,16 @@ and a blank line separates it from what follows.
 - A comment body is ordinary sanitized Markdown (bold, links and inline math
   render normally), stored one `> ` level deep and capped at 4 KB including
   quoting. A header is a single line of at most 120 characters.
+- **Edit Comment…** opens the comment the caret is in (or the nearest one) with
+  its text loaded, and saves over the same block. **Remove Comment** deletes that
+  block, and **Remove All Comments** deletes every comment in the document,
+  leaving the prose untouched. All three are undoable with Ctrl+Z.
+- The accelerator is **Ctrl+Shift+M**. It was Ctrl+Alt+M, which cannot work on a
+  layout where Ctrl+Alt is AltGr: the OS turns that combination into a character
+  (it arrived as "ṁ" with no modifier flags and an empty `code`), so it reaches
+  neither the menu accelerator nor the webview. Ctrl+Shift+M is never an AltGr
+  combination. If a key seems dead, the right-click menu and the Edit menu do the
+  same thing.
 - Comments are excluded from word and character counts and from the outline, and
   are skipped by in-document search in Read/Split Mode (Edit Mode searches the
   raw source, so it still finds them).
@@ -331,7 +341,7 @@ Lighthouse cannot interact with the application, so this measures the **empty wo
 ## Testing
 
 ```bash
-npm test        # 318 tests (Vitest + React Testing Library, jsdom)
+npm test        # 329 tests (Vitest + React Testing Library, jsdom)
 npm run test:rust  # 36 tests (cargo test)
 ```
 
@@ -363,7 +373,7 @@ npm run check:security   # attack probes against the packaged app
 
 `check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, replace-all, the TOC, and zero page errors. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
 
-`check:e2e` drives the packaged application through a full editing session: it writes a temporary Markdown file, opens it with `--file`, renders it, types into the editor, replaces text through the find-and-replace UI, saves with Ctrl+S and verifies the bytes on disk, modifies the file from outside and confirms the reload, adds a comment with `Ctrl+Alt+M`, checks the annotation renders and reaches the file, undoes it with Ctrl+Z, copies rendered HTML, and switches to Read Mode. Native dialogs (file picker, print, export destination) are the only part of the flow that cannot be automated.
+`check:e2e` drives the packaged application through a full editing session: it writes a temporary Markdown file, opens it with `--file`, renders it, types into the editor, replaces text through the find-and-replace UI, saves with Ctrl+S and verifies the bytes on disk, modifies the file from outside and confirms the reload, adds a comment with `Ctrl+Shift+M`, checks the annotation renders and reaches the file, undoes it with Ctrl+Z, copies rendered HTML, and switches to Read Mode. Native dialogs (file picker, print, export destination) are the only part of the flow that cannot be automated.
 
 Every packaged check accepts `MDEDITOR_EXE` to point at an installed copy
 (`%LOCALAPPDATA%\Markdown Editor\mdeditor.exe`) instead of the build in this
@@ -394,21 +404,21 @@ MDEDITOR_EXE="$LOCALAPPDATA/Markdown Editor/mdeditor.exe" npm run check:e2e
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
-Re-run for 1.1.0 on 2026-11-21 (Windows, Node 24.13.0): 318 Vitest tests, 39 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 3/3, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
+Re-run for 1.1.0 on 2026-11-21 (Windows, Node 24.13.0): 329 Vitest tests, 39 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 3/3, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
 
 | Check | Command | Result |
 |---|---|---|
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 318 passed |
+| Unit and integration tests | `npm test` | 329 passed |
 | Native tests | `npm run test:rust` | 36 passed |
 | File association | double-click a `.md` in Explorer | launches the app with that file; second file forwards to the running window (verified: 1 process, tab added) |
 | Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
 | End-to-end session | `npm run check:e2e` | 18/18: open via `--file`, render, edit, replace, save to disk, external reload, add a comment by keyboard, confirm it renders and is written to the file, undo it, copy HTML, mode switch |
 | Security check | `npm run check:security` | 13/13: Mermaid link cannot navigate the webview, remote images are not fetched until opt-in, hostile Markdown stays inert, only canonical comment blocks are tagged (a comment cannot hide real content or reach the outline), the window still closes |
-| Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation), the Edit submenu contains **Add Comment…**, and its native accelerator reads `Ctrl+Alt+M`. Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
+| Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation), the Edit submenu contains **Add Comment…**, and its native accelerator reads `Ctrl+Shift+M`. Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
 | Desktop release build | `npm run tauri:build` | passed; NSIS and MSI installers produced |
 | Packaged app boot | run `src-tauri/target/release/mdeditor.exe` | process stayed alive, React mounted, and `%APPDATA%\com.rea.mdeditor\settings.json` was written through IPC with the expected defaults |
 | Benchmark | `npm run bench` | see Performance: 200 KB in ~491 ms of pipeline time, 5 MB in ~24 s |

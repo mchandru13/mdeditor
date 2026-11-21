@@ -125,9 +125,31 @@ function codeLineMask(lines: Line[]): boolean[] {
  * which keeps a hostile file from turning it quadratic.
  */
 export function commentBlockStarts(source: string): number[] {
+  return scanComments(source).map((comment) => comment.start);
+}
+
+export interface CommentBlock {
+  /** Offset of the blockquote's `>`. */
+  start: number;
+  /** Offset just past the block's last line, before its newline. */
+  end: number;
+  /** Header text after the marker, e.g. "chand 2026-11-21". */
+  header: string;
+  /** Body lines with the blockquote prefixes stripped. */
+  body: string;
+}
+
+/**
+ * Every canonical comment block, with the offsets needed to remove one.
+ *
+ * Shares its rule with the renderer (`commentBlockStarts` is derived from this),
+ * so what the app offers to edit or remove is exactly what it renders as a
+ * comment.
+ */
+export function scanComments(source: string): CommentBlock[] {
   const lines = splitLines(source);
   const code = codeLineMask(lines);
-  const starts: number[] = [];
+  const blocks: CommentBlock[] = [];
 
   let index = 0;
   while (index < lines.length) {
@@ -146,14 +168,51 @@ export function commentBlockStarts(source: string): number[] {
     // Extra spaces after `>` are tolerated, matching how Markdown reads them.
     const markerLine = stripQuote(line.text).replace(/^[ \t]+/, '');
     const ownsParagraph = end === index || stripQuote(lines[index + 1]!.text).trim() === '';
-    if (commentHeaderText(markerLine) !== null && ownsParagraph) {
-      starts.push(line.start + line.text.indexOf('>'));
+    const header = commentHeaderText(markerLine);
+    if (header !== null && ownsParagraph) {
+      const bodyLines: string[] = [];
+      for (let cursor = index + 1; cursor <= end; cursor += 1) {
+        bodyLines.push(stripQuote(lines[cursor]!.text));
+      }
+      // The marker's own blank `>` separator is structural, not content.
+      if (bodyLines.length > 0 && bodyLines[0]!.trim() === '') bodyLines.shift();
+      blocks.push({
+        start: line.start + line.text.indexOf('>'),
+        end: lines[end]!.end,
+        header,
+        body: bodyLines.join('\n').replace(/\s+$/, ''),
+      });
     }
 
     index = end + 1;
   }
 
-  return starts;
+  return blocks;
+}
+
+/**
+ * Removes one comment block, leaving a single blank line between its neighbours.
+ *
+ * Normalises rather than restoring the original whitespace: the source does not
+ * record how many blank lines surrounded the block before it was inserted, so
+ * anything else would be guesswork. Document text on both sides is preserved.
+ */
+export function removeCommentBlock(source: string, block: CommentBlock): string {
+  const eol = source.includes('\r\n') ? '\r\n' : '\n';
+  const left = source.slice(0, block.start).replace(/(?:\r?\n)+$/, '');
+  const right = source.slice(block.end).replace(/^(?:\r?\n)+/, '');
+  if (left === '') return right;
+  if (right === '') return `${left}${eol}`;
+  return `${left}${eol}${eol}${right}`;
+}
+
+/** Removes every comment block, keeping the rest of the document intact. */
+export function removeAllCommentBlocks(source: string): { source: string; removed: number } {
+  const blocks = scanComments(source);
+  let next = source;
+  // Remove from the end so earlier offsets stay valid.
+  for (const block of [...blocks].reverse()) next = removeCommentBlock(next, block);
+  return { source: next, removed: blocks.length };
 }
 
 /**

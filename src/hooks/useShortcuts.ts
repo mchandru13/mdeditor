@@ -7,7 +7,7 @@ export type ShortcutName =
   | 'mod+3'
   | 'mod+f'
   | 'mod+h'
-  | 'mod+alt+m'
+  | 'mod+shift+m'
   | 'mod+s'
   | 'mod+shift+s'
   | 'mod+o'
@@ -21,7 +21,7 @@ const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(naviga
 /**
  * Maps a key event to a shortcut name, or null.
  *
- * Exported so the mapping can be tested without a window: the Ctrl+Alt+M guard
+ * Exported so the mapping can be tested without a window: the accelerator guard
  * was silently rejecting the key on whole keyboard layouts.
  */
 export function shortcutForEvent(event: KeyboardEvent): ShortcutName | null {
@@ -38,15 +38,13 @@ export function shortcutForEvent(event: KeyboardEvent): ShortcutName | null {
   if (key === '3') return 'mod+3';
   if (key === 'f') return 'mod+f';
   if (key === 'h') return 'mod+h';
-  // Ctrl+Alt+M (the accelerator the menu advertises).
+  // Ctrl+Shift+M, the accelerator the menu advertises.
   //
-  // This deliberately does not bail out on `getModifierState('AltGraph')`. On
-  // layouts where Ctrl+Alt reports as AltGr, that flag made the shortcut a no-op
-  // for the whole machine — the user pressed the documented key and nothing
-  // happened at all. The cost is that on such a layout AltGr+M types its
-  // character into the editor instead of opening the dialog, which is one rare
-  // keystroke against a documented command that never fired.
-  if (key === 'm' && event.altKey && !event.shiftKey) return 'mod+alt+m';
+  // Deliberately not Ctrl+Alt+M: on layouts where Ctrl+Alt is AltGr the OS
+  // consumes that combination as text (Ctrl+Alt+M arrived as `key: "ṁ"` with
+  // `ctrl` and `alt` both false, and an empty `code`), so it reached neither the
+  // accelerator nor this handler. Ctrl+Shift+M is never an AltGr combination.
+  if (key === 'm' && event.shiftKey) return 'mod+shift+m';
   if (key === 'o') return 'mod+o';
   if (key === 'w') return 'mod+w';
   if (key === 's') return event.shiftKey ? 'mod+shift+s' : 'mod+s';

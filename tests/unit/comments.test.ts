@@ -6,6 +6,9 @@ import {
   MAX_COMMENT_HEADER_CHARS,
   commentBlockStarts,
   commentHeaderText,
+  removeAllCommentBlocks,
+  removeCommentBlock,
+  scanComments,
   findInsertPoint,
   formatCommentBlock,
   insertBlockComment,
@@ -243,5 +246,72 @@ describe('validateComment', () => {
 
   it('rejects a header longer than the dialog allows', () => {
     expect(validateComment('h'.repeat(MAX_COMMENT_HEADER_CHARS + 1), 'note')).not.toBeNull();
+  });
+});
+
+describe('scanComments and removal', () => {
+  const doc = [
+    'First paragraph.',
+    '',
+    '> [!comment] chand',
+    '>',
+    '> first note',
+    '',
+    'Second paragraph.',
+    '',
+    '> [!comment]',
+    '>',
+    '> second note',
+    '',
+  ].join('\n');
+
+  it('reports header, body and offsets for each comment', () => {
+    const blocks = scanComments(doc);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toMatchObject({ header: 'chand', body: 'first note' });
+    expect(blocks[1]).toMatchObject({ header: '', body: 'second note' });
+    expect(doc.slice(blocks[0]!.start, blocks[0]!.start + 2)).toBe('> ');
+    expect(doc.slice(blocks[0]!.start, blocks[0]!.end)).toContain('first note');
+  });
+
+  it('removes one comment and keeps the rest of the document', () => {
+    const blocks = scanComments(doc);
+    const next = removeCommentBlock(doc, blocks[0]!);
+    expect(next).toContain('First paragraph.');
+    expect(next).toContain('Second paragraph.');
+    expect(next).not.toContain('first note');
+    expect(next).toContain('second note');
+    expect(scanComments(next)).toHaveLength(1);
+  });
+
+  it('removes every comment without touching prose', () => {
+    const { source: next, removed } = removeAllCommentBlocks(doc);
+    expect(removed).toBe(2);
+    expect(next).toBe('First paragraph.\n\nSecond paragraph.\n');
+    expect(scanComments(next)).toHaveLength(0);
+  });
+
+  it('reports zero when there is nothing to remove', () => {
+    expect(removeAllCommentBlocks('Just prose.\n')).toEqual({
+      source: 'Just prose.\n',
+      removed: 0,
+    });
+  });
+
+  it('keeps fenced code that mentions the marker', () => {
+    const fenced = ['```', '> [!comment] x', '>', '> body', '```', ''].join('\n');
+    expect(scanComments(fenced)).toHaveLength(0);
+    expect(removeAllCommentBlocks(fenced).source).toBe(fenced);
+  });
+
+  it('round-trips an edit: remove, reinsert at the same anchor', () => {
+    const blocks = scanComments(doc);
+    const without = removeCommentBlock(doc, blocks[0]!);
+    const point = findInsertPoint(without, 0, 0)!;
+    const edited = insertBlockComment(without, point, 'chand', 'edited note');
+    expect(scanComments(edited.source).map((block) => block.body)).toEqual([
+      'edited note',
+      'second note',
+    ]);
   });
 });

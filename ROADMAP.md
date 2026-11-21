@@ -5,7 +5,7 @@ application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
 
-Current state: 318 TypeScript tests and 39 Rust tests pass (2026-11-21), and all
+Current state: 329 TypeScript tests and 39 Rust tests pass (2026-11-21), and all
 five packaged-app checks were re-run on this build: `check:menu` 3/3, `check:ui`
 18/18, `check:app` 10/10, `check:e2e` 18/18 and `check:security` 13/13. File
 associations for `.md` and `.markdown` are registered by the installer and

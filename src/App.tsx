@@ -19,7 +19,15 @@ import { useScrollSpy } from './hooks/useScrollSpy';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useTheme } from './hooks/useTheme';
 import { detectEncoding, toEditorText, toFileText } from './lib/encoding';
-import { findInsertPoint, insertBlockComment } from './lib/comments';
+import {
+  findInsertPoint,
+  formatCommentBlock,
+  insertBlockComment,
+  removeAllCommentBlocks,
+  removeCommentBlock,
+  scanComments,
+  type CommentBlock,
+} from './lib/comments';
 import { escapeSelector } from './lib/dom';
 import { buildStandaloneHtml, ExportTooLargeError, formatReport } from './lib/exportHtml';
 import { EXPORT_CSS } from './lib/exportStyles';
@@ -93,6 +101,9 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     from: number;
     to: number;
     target: string;
+    /** Present when editing an existing comment. */
+    existing?: { header: string; body: string };
+    block?: CommentBlock;
   } | null>(null);
   const [infoDialog, setInfoDialog] = useState<InfoDialogKind | null>(null);
   const [urlBusy, setUrlBusy] = useState(false);
@@ -671,8 +682,8 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     if (!selection) {
       setMessage(
         mode === 'read'
-          ? 'Select text in the document first, then press Ctrl+Alt+M.'
-          : 'Select the text to comment on first, then press Ctrl+Alt+M.',
+          ? 'Select text in the document first, then press Ctrl+Shift+M.'
+          : 'Select the text to comment on first, then press Ctrl+Shift+M.',
       );
       return;
     }
@@ -703,6 +714,28 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         return;
       }
 
+      // Editing rewrites the existing block in place: same position, same
+      // neighbours, new text.
+      if (commentDialog.block) {
+        const block = commentDialog.block;
+        const blockSource = doc.source.slice(block.start, block.end);
+        const replacement = formatCommentBlock(comment.header, comment.body);
+        const offset = blockSource.indexOf('>');
+        const editorForEdit = editorRef.current;
+        if (editorForEdit && offset !== -1) {
+          editorForEdit.replaceRange(block.start, block.end, replacement);
+        } else {
+          dispatch({
+            type: 'edit',
+            id: doc.id,
+            source: `${doc.source.slice(0, block.start)}${replacement}${doc.source.slice(block.end)}`,
+          });
+        }
+        setCommentDialog(null);
+        setMessage('Comment updated.');
+        return;
+      }
+
       const point = findInsertPoint(doc.source, commentDialog.from, commentDialog.to);
       if (!point) {
         setMessage('That selection can no longer be commented.');
@@ -723,6 +756,83 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     },
     [commentDialog, doc],
   );
+
+  /**
+   * Opens the dialog for the comment the caret is in, or the comment nearest the
+   * selection, so "Edit Comment" does not require selecting the whole block.
+   */
+  const editComment = useCallback(() => {
+    const current = activeDocument(stateRef.current);
+    if (!current) {
+      setMessage('Open a document before editing a comment.');
+      return;
+    }
+
+    const blocks = scanComments(current.source);
+    if (blocks.length === 0) {
+      setMessage('This document has no comments.');
+      return;
+    }
+
+    const selection = editorRef.current?.getSelection() ?? null;
+    const at = selection?.from ?? 0;
+    // The block containing the caret, else the one closest to it.
+    const block =
+      blocks.find((candidate) => at >= candidate.start && at <= candidate.end) ??
+      blocks.reduce((best, candidate) =>
+        Math.abs(candidate.start - at) < Math.abs(best.start - at) ? candidate : best,
+      );
+
+    setCommentDialog({
+      source: current.source,
+      from: block.start,
+      to: block.end,
+      target: anchorLabel(current.source, block.start),
+      existing: { header: block.header, body: block.body },
+      block,
+    });
+  }, []);
+
+  const removeComment = useCallback(() => {
+    const current = activeDocument(stateRef.current);
+    if (!current || !commentDialog?.block) return;
+
+    const blocks = scanComments(current.source);
+    const target = blocks.find((candidate) => candidate.start === commentDialog.block!.start);
+    if (!target) {
+      setMessage('That comment is no longer in the document.');
+      setCommentDialog(null);
+      return;
+    }
+
+    const next = removeCommentBlock(current.source, target);
+    const editor = editorRef.current;
+    if (editor) {
+      applySourceDiff(editor, current.source, next);
+    } else {
+      dispatch({ type: 'edit', id: current.id, source: next });
+    }
+
+    setCommentDialog(null);
+    setMessage('Comment removed.');
+  }, [commentDialog]);
+
+  const removeAllComments = useCallback(() => {
+    const current = activeDocument(stateRef.current);
+    if (!current) return;
+
+    const { source: next, removed } = removeAllCommentBlocks(current.source);
+    if (removed === 0) {
+      setMessage('This document has no comments.');
+      return;
+    }
+
+    const editor = editorRef.current;
+    if (editor) applySourceDiff(editor, current.source, next);
+    else dispatch({ type: 'edit', id: current.id, source: next });
+
+    setMessage(`Removed ${removed} comment${removed === 1 ? '' : 's'}.`);
+  }, []);
 
   /* ---------------------------------------------------------------- shortcuts */
 
@@ -749,7 +859,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         if (current) void saveDocument(current, true);
       },
       'mod+o': () => void openFromDialog(),
-      'mod+alt+m': () => startComment(),
+      'mod+shift+m': () => startComment(),
       'mod+w': () => {
         const current = activeDocument(stateRef.current);
         if (current) void closeDocument(current.id);
@@ -971,6 +1081,15 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         case 'edit.comment':
           startComment();
           break;
+        case 'edit.comment.edit':
+          editComment();
+          break;
+        case 'edit.comment.remove':
+          removeComment();
+          break;
+        case 'edit.comment.removeAll':
+          removeAllComments();
+          break;
         case 'view.read':
           setMode('read');
           break;
@@ -1019,6 +1138,9 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     platform,
     saveDocument,
     startComment,
+    editComment,
+    removeComment,
+    removeAllComments,
   ]);
   /* ------------------------------------------------------- external changes */
 
@@ -1262,6 +1384,8 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
             onCancel={() => setCommentDialog(null)}
             onSubmit={submitComment}
             target={commentDialog.target}
+            existing={commentDialog.existing}
+            onRemove={commentDialog.block ? removeComment : undefined}
           />
         ) : null}
 
@@ -1304,4 +1428,28 @@ function anchorLabel(source: string, anchorEnd: number): string {
   while (start > 0 && (lines[start - 1] ?? '').trim() !== '') start -= 1;
   const text = (lines[start] ?? '').trim();
   return text.length > 60 ? `${text.slice(0, 57)}…` : text;
+}
+
+/**
+ * Applies the difference between two whole-document strings as one transaction.
+ *
+ * Comment removal changes a block and the blank lines around it, which is not a
+ * single contiguous slice that is simply deleted (the separator collapses rather
+ * than vanishing). Computing the smallest changed range avoids hard-coding which
+ * bytes `removeCommentBlock` happened to touch, and keeps the edit undoable as
+ * one step instead of replacing the whole buffer.
+ */
+function applySourceDiff(editor: EditorHandle, previous: string, next: string): void {
+  let start = 0;
+  const shortest = Math.min(previous.length, next.length);
+  while (start < shortest && previous[start] === next[start]) start += 1;
+
+  let endPrevious = previous.length;
+  let endNext = next.length;
+  while (endPrevious > start && endNext > start && previous[endPrevious - 1] === next[endNext - 1]) {
+    endPrevious -= 1;
+    endNext -= 1;
+  }
+
+  editor.replaceRange(start, endPrevious, next.slice(start, endNext));
 }

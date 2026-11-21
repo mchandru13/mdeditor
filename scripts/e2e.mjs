@@ -211,7 +211,9 @@ try {
 
   // Select that paragraph and add a comment from the keyboard, as a user would.
   await page.keyboard.press('Shift+Home');
-  await page.keyboard.press('Control+Alt+KeyM');
+  // Ctrl+Shift+M, the documented accelerator. Ctrl+Alt+M does not work on
+  // layouts where Ctrl+Alt is AltGr: the OS consumes it as text.
+  await page.keyboard.press('Control+Shift+KeyM');
   await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
   await page.locator('#comment-body').fill('Packaged comment check.');
   await page.getByRole('button', { name: 'Add comment' }).click();

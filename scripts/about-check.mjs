@@ -96,8 +96,8 @@ try {
     ? await page.evaluate(() => document.querySelector('[role="dialog"]')?.textContent ?? '')
     : '';
   check(
-    'shortcut list documents Ctrl+Alt+M',
-    /Ctrl\+Alt\+M/.test(shortcutText) && /Add a comment/.test(shortcutText),
+    'shortcut list documents Ctrl+Shift+M',
+    /Ctrl\+Shift\+M/.test(shortcutText) && /Add a comment/.test(shortcutText),
     JSON.stringify(shortcutText.slice(0, 120)),
   );
 } catch (error) {
