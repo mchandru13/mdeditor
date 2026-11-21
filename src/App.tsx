@@ -761,7 +761,15 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
    * Opens the dialog for the comment the caret is in, or the comment nearest the
    * selection, so "Edit Comment" does not require selecting the whole block.
    */
-  const editComment = useCallback(() => {
+  /**
+   * Opens the dialog for one comment.
+   *
+   * With `index`, that exact block is used — this is how a right-click on a
+   * rendered comment edits that comment rather than whatever the caret was last
+   * in. Without it, the block is chosen from the editor caret: the one
+   * containing it, else the nearest.
+   */
+  const openCommentAt = useCallback((index?: number) => {
     const current = activeDocument(stateRef.current);
     if (!current) {
       setMessage('Open a document before editing a comment.');
@@ -774,14 +782,23 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
       return;
     }
 
-    const selection = editorRef.current?.getSelection() ?? null;
-    const at = selection?.from ?? 0;
-    // The block containing the caret, else the one closest to it.
-    const block =
-      blocks.find((candidate) => at >= candidate.start && at <= candidate.end) ??
-      blocks.reduce((best, candidate) =>
-        Math.abs(candidate.start - at) < Math.abs(best.start - at) ? candidate : best,
-      );
+    let block = index === undefined ? undefined : blocks[index];
+    if (index !== undefined && !block) {
+      // The render and the source disagreed (edited between the click and the
+      // menu item). Say so instead of editing a different comment.
+      setMessage('That comment is no longer in the document.');
+      return;
+    }
+
+    if (!block) {
+      const selection = editorRef.current?.getSelection() ?? null;
+      const at = selection?.from ?? 0;
+      block =
+        blocks.find((candidate) => at >= candidate.start && at <= candidate.end) ??
+        blocks.reduce((best, candidate) =>
+          Math.abs(candidate.start - at) < Math.abs(best.start - at) ? candidate : best,
+        );
+    }
 
     setCommentDialog({
       source: current.source,
@@ -792,6 +809,29 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
       block,
     });
   }, []);
+
+  const editComment = useCallback(() => openCommentAt(), [openCommentAt]);
+
+  /** Removes one comment by its position in the document, without a dialog. */
+  const removeCommentAt = useCallback(
+    (index: number) => {
+      const current = activeDocument(stateRef.current);
+      if (!current) return;
+
+      const block = scanComments(current.source)[index];
+      if (!block) {
+        setMessage('That comment is no longer in the document.');
+        return;
+      }
+
+      const next = removeCommentBlock(current.source, block);
+      const editor = editorRef.current;
+      if (editor) applySourceDiff(editor, current.source, next);
+      else dispatch({ type: 'edit', id: current.id, source: next });
+      setMessage('Comment removed.');
+    },
+    [],
+  );
 
   const removeComment = useCallback(() => {
     const current = activeDocument(stateRef.current);
@@ -1282,7 +1322,12 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
           {doc ? (
           <section className="panes" style={gridStyle}>
-            <SelectionContextMenu scope={viewerElementRef.current} onAddComment={startComment} />
+            <SelectionContextMenu
+              scope={viewerElementRef.current}
+              onAddComment={startComment}
+              onEditComment={openCommentAt}
+              onRemoveComment={removeCommentAt}
+            />
             {mode !== 'read' ? (
               <div className="pane pane-editor">
                 <Editor

@@ -232,6 +232,9 @@ and a blank line separates it from what follows.
   editor is mounted: the selected text is matched back to the document source.
   With nothing selected the command asks for a selection instead of guessing a
   position.
+- Right-clicking a **rendered comment** offers **Edit Comment…** and **Remove
+  Comment** for that comment, regardless of where the caret is. That is the
+  quickest way to revise a note while reading.
 - A comment body is ordinary sanitized Markdown (bold, links and inline math
   render normally), stored one `> ` level deep and capped at 4 KB including
   quoting. A header is a single line of at most 120 characters.

@@ -121,3 +121,73 @@ describe('Add Comment from the preview', () => {
     expect(screen.queryByRole('menuitem', { name: 'Add Comment…' })).toBeNull();
   });
 });
+
+describe('right-click on a rendered comment', () => {
+  const TWO = [
+    'First paragraph.',
+    '',
+    '> [!comment] chand',
+    '>',
+    '> first note',
+    '',
+    'Second paragraph.',
+    '',
+    '> [!comment]',
+    '>',
+    '> second note',
+    '',
+  ].join('\n');
+
+  async function openWithTwoComments() {
+    const platform = createFakePlatform({ clipboard: TWO });
+    render(<App platform={platform} initialMode="read" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
+    await screen.findByRole('tab', { name: /Pasted document/ });
+    await waitFor(() => {
+      expect(document.querySelectorAll('.markdown-body .mdeditor-comment')).toHaveLength(2);
+    });
+    return { platform };
+  }
+
+  /** Right-clicks the *second* rendered comment. */
+  function rightClickSecondComment() {
+    const comments = document.querySelectorAll('.markdown-body .mdeditor-comment');
+    expect(comments).toHaveLength(2);
+    fireEvent.contextMenu(comments[1]!, { clientX: 100, clientY: 200 });
+  }
+
+  it('offers Edit and Remove for that comment, not Add', async () => {
+    await openWithTwoComments();
+    rightClickSecondComment();
+
+    expect(await screen.findByRole('menuitem', { name: 'Edit Comment…' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Remove Comment' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Add Comment…' })).toBeNull();
+  });
+
+  it('edits the comment that was right-clicked, not the caret one', async () => {
+    await openWithTwoComments();
+    rightClickSecondComment();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit Comment…' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Edit comment' });
+    // Read Mode has no editor caret at all, so this can only come from the
+    // rendered comment that was clicked.
+    expect((dialog.querySelector('#comment-body') as HTMLTextAreaElement).value).toBe('second note');
+  });
+
+  it('removes the comment that was right-clicked and leaves the other', async () => {
+    const { platform } = await openWithTwoComments();
+    rightClickSecondComment();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove Comment' }));
+
+    await waitFor(() => {
+      expect(document.querySelectorAll('.markdown-body .mdeditor-comment')).toHaveLength(1);
+    });
+    // The first comment is the one left behind.
+    const remaining = document.querySelector('.markdown-body .mdeditor-comment')?.textContent ?? '';
+    expect(remaining).toContain('first note');
+    expect(remaining).not.toContain('second note');
+    void platform;
+  });
+});
