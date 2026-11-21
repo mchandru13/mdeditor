@@ -140,6 +140,19 @@ Notes that save time:
   investigating.
 - The CI workflow runs the fast suites only. A green CI does **not** mean the
   packaged checks ran.
+- `src-tauri/target/` grows about 340 MB per **release** build and is never
+  pruned: the release profile sets `lto = true`, so each build leaves one large
+  `libmdeditor_lib.rlib`, and cargo keeps every fingerprint it has seen. One
+  session of repeated `tauri:build` runs reached **19 GB**. Run `npm run clean`
+  when the directory gets large (it keeps the dependency cache and the
+  installers); `npm run clean -- --all` is the full `cargo clean`. Check first
+  with `npm run clean -- --dry-run`.
+- A rustc failure reading `memory allocation failed` or
+  `STATUS_STACK_BUFFER_OVERRUN`, or linker crash `0xC0000409`, is this machine
+  running out of **commit charge** — not a code error, and cleaning `target/`
+  does not help. Compare `(Get-Counter '\Memory\Committed Bytes')` with
+  `(Get-Counter '\Memory\Commit Limit')` before investigating the change. The
+  `windows` crate is the peak-memory compile and dies first.
 
 ## Build and release gotchas
 

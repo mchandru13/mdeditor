@@ -116,6 +116,7 @@ The workflow refuses to publish when the tag and the three version fields disagr
 | `npm run tauri:dev` | Desktop app with hot reload |
 | `npm run tauri:build` | Release build and installers |
 | `npm run bench` | Markdown pipeline benchmark (writes `bench/results.json`) |
+| `npm run clean` | Reclaims `src-tauri/target/` space, keeping the dependency cache (see AGENTS.md) |
 | `npm run check:ui` | Playwright smoke test against the production bundle (needs `npm run preview` on :4173) |
 | `npm run check:app` | Playwright + CDP smoke test against the packaged desktop app |
 | `npm run check:menu` | Windows UI Automation check of the native menu bar and the Edit submenu |
