@@ -7,6 +7,7 @@ export type ShortcutName =
   | 'mod+3'
   | 'mod+f'
   | 'mod+h'
+  | 'mod+alt+m'
   | 'mod+s'
   | 'mod+shift+s'
   | 'mod+o'
@@ -31,6 +32,12 @@ function shortcutFor(event: KeyboardEvent): ShortcutName | null {
   if (key === '3') return 'mod+3';
   if (key === 'f') return 'mod+f';
   if (key === 'h') return 'mod+h';
+  // AltGr reports as Ctrl+Alt on Windows; on layouts where it produces a letter
+  // that letter is text, not a shortcut.
+  if (key === 'm' && event.altKey && !event.shiftKey) {
+    if (event.getModifierState?.('AltGraph')) return null;
+    return 'mod+alt+m';
+  }
   if (key === 'o') return 'mod+o';
   if (key === 'w') return 'mod+w';
   if (key === 's') return event.shiftKey ? 'mod+shift+s' : 'mod+s';

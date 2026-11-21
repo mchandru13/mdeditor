@@ -29,11 +29,12 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { rehypeTrimmedHighlight } from './highlight';
 import { visit } from 'unist-util-visit';
 import { toString } from 'mdast-util-to-string';
-import type { Element, Root as HastRoot, Text } from 'hast';
+import type { Element, Nodes as HastNodes, Root as HastRoot, Text } from 'hast';
 import type { Root as MdastRoot, Html, Nodes } from 'mdast';
 import type { Options as RehypeOptions } from 'remark-rehype';
 
 import { resolveResource } from './assetResolver';
+import { commentBlockStarts, commentHeaderText } from './comments';
 import { countWords } from './encoding';
 import { createSlugger } from './slug';
 import type {
@@ -156,14 +157,6 @@ function applyHighlight(tree: HastRoot): HastRoot {
   }
 }
 
-function collectHeadingLines(tree: MdastRoot): number[] {
-  const lines: number[] = [];
-  visit(tree, 'heading', (node) => {
-    lines.push(node.position?.start.line ?? 1);
-  });
-  return lines;
-}
-
 export function toText(node: Element | Text | HastRoot): string {
   if (node.type === 'text') return node.value;
   return node.children.map((child) => toText(child as Element | Text)).join('');
@@ -172,6 +165,74 @@ export function toText(node: Element | Text | HastRoot): string {
 /** HTML used by word/character counts and search summaries. */
 export function hastToPlainText(tree: HastRoot): string {
   return toText(tree).replace(/\s+/g, ' ').trim();
+}
+
+export const COMMENT_CLASS = 'mdeditor-comment';
+export const COMMENT_HEADER_CLASS = 'mdeditor-comment-header';
+
+/**
+ * Marks comment blockquotes so they can be styled and excluded from statistics.
+ *
+ * The source scanner decides what a comment is, not the HAST shape: a canonical
+ * comment and a quoted paragraph that merely starts with the marker produce the
+ * same elements, because the `>` separator line leaves no node behind. Matching
+ * the blockquote's source offset against `commentBlockStarts` is therefore the
+ * only way the renderer can agree with the parser — and it matters, because a
+ * tagged quote is hidden from search and stripped from exports.
+ *
+ * Only the marker text is replaced; inline formatting the author typed in the
+ * header is kept as sanitized nodes.
+ */
+function markComments(tree: HastRoot, source: string): void {
+  const starts = new Set(commentBlockStarts(source));
+
+  visit(tree, 'element', (node: Element) => {
+    if (node.tagName !== 'blockquote') return;
+    const start = node.position?.start?.offset;
+    if (start === undefined || !starts.has(start)) return;
+
+    // The scanner matched the block; this only locates the marker to strip it.
+    const first = node.children.find((child): child is Element => child.type === 'element');
+    if (!first || first.tagName !== 'p') return;
+    const text = first.children[0];
+    if (text?.type !== 'text') return;
+    const headerText = commentHeaderText(text.value);
+    if (headerText === null) return;
+
+    node.properties = { ...node.properties, className: [COMMENT_CLASS] };
+    first.properties = { ...first.properties, className: [COMMENT_HEADER_CLASS] };
+    // Replace only the marker prefix so `> [!comment] **chand**` keeps "chand".
+    first.children[0] = { type: 'text', value: headerText };
+  });
+}
+
+/**
+ * Every node inside a comment blockquote, so statistics and the outline can
+ * ignore editorial text.
+ *
+ * One depth-carrying walk: collecting marked roots and then re-walking each of
+ * them is quadratic on nested blockquotes, which a hostile file can stack
+ * thousands deep.
+ */
+function editorialNodes(tree: HastRoot): Set<HastNodes> {
+  const inside = new Set<HastNodes>();
+
+  const walk = (node: HastNodes, inComment: boolean): void => {
+    let editorial = inComment;
+    if (node.type === 'element') {
+      const classes = node.properties?.className;
+      if (Array.isArray(classes) && classes.map(String).includes(COMMENT_CLASS)) {
+        editorial = true;
+      }
+    }
+    if (editorial) inside.add(node);
+    if (node.type === 'root' || node.type === 'element') {
+      for (const child of node.children) walk(child, editorial);
+    }
+  };
+
+  walk(tree, false);
+  return inside;
 }
 
 interface PostProcessResult {
@@ -212,10 +273,11 @@ function postProcess(tree: HastRoot, options: RenderOptions): PostProcessResult 
   const placeholders = { mermaid: 0, math: 0 };
   const blocked = { count: 0 };
   const allowRemoteImages = options.remoteImages === 'allow';
+  const editorial = editorialNodes(tree);
 
   visit(tree, (node) => {
     if (node.type === 'text') {
-      textParts.push(node.value);
+      if (!editorial.has(node)) textParts.push(node.value);
       return;
     }
 
@@ -242,6 +304,12 @@ function postProcess(tree: HastRoot, options: RenderOptions): PostProcessResult 
           isRemoteUrl(resolved.url)
         ) {
           blockRemoteImage(element, resolved.url, blocked);
+          // The placeholder text is created after the editorial set was built, so
+          // add it explicitly: a blocked image inside a comment is still comment
+          // text and must not reach the word count.
+          if (editorial.has(element)) {
+            for (const child of element.children) editorial.add(child);
+          }
         }
       }
     }
@@ -261,6 +329,9 @@ function postProcess(tree: HastRoot, options: RenderOptions): PostProcessResult 
 
   visit(tree, 'element', (node: Element) => {
     if (node.tagName.length !== 2 || node.tagName[0] !== 'h') return;
+    // A heading typed inside a comment is editorial, not a section of the
+    // document; it must not appear in the outline or get an anchor id.
+    if (editorial.has(node)) return;
     const depth = Number(node.tagName.slice(1));
     if (!Number.isInteger(depth) || depth < 1 || depth > 6) return;
 
@@ -280,7 +351,10 @@ function postProcess(tree: HastRoot, options: RenderOptions): PostProcessResult 
       children: [{ type: 'text', value: '#' }],
     });
 
-    headings.push({ id, text, depth, line: 0 });
+    // The HAST position survives sanitize and chunking, and unlike an index into
+    // a separate mdast list it cannot drift when a heading inside a comment is
+    // skipped above it.
+    headings.push({ id, text, depth, line: node.position?.start.line ?? 1 });
   });
 
   return {
@@ -494,7 +568,6 @@ export function renderMarkdown(source: string, options: RenderOptions): RenderOu
   const mdast = parseMarkdown(source, options.chunking ?? true);
   const parseTime = now() - parseStarted;
 
-  const headingLines = collectHeadingLines(mdast);
   const transformStarted = now();
   let tree = PARSER.runSync(mdast);
   rehypeMermaidPlaceholders()(tree);
@@ -511,6 +584,10 @@ export function renderMarkdown(source: string, options: RenderOptions): RenderOu
 
   const postStarted = now();
 
+  // Tag comment blockquotes before statistics are collected, so their text can
+  // be excluded from word and character counts.
+  markComments(tree, source);
+
   // Large documents keep placeholders as plain text blocks instead of
   // expensive diagram/math components.
   if (options.disableRichContent) {
@@ -518,9 +595,6 @@ export function renderMarkdown(source: string, options: RenderOptions): RenderOu
   }
 
   const post = postProcess(tree, options);
-  for (const [index, heading] of post.headings.entries()) {
-    heading.line = headingLines[index] ?? 1;
-  }
   const words = countWords(post.text);
   const postTime = now() - postStarted;
 

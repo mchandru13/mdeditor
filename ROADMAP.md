@@ -5,10 +5,9 @@ application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
 
-Current state: 213 TypeScript tests and 36 Rust tests pass, re-run for 1.0.3 on
-2026-11-21. The three packaged-app checks (`check:ui` 18/18, `check:app` 10/10,
-`check:e2e` 12/12) last passed against the 1.0.2 build and were not re-run for
-1.0.3. File associations for `.md` and `.markdown` are registered by the
+Current state: 285 TypeScript tests and 36 Rust tests pass (2026-11-21). The three
+packaged-app checks (`check:ui` 18/18, `check:app` 10/10, `check:e2e` 12/12) last
+passed against the 1.0.2 build and were not re-run for 1.0.3. File associations for `.md` and `.markdown` are registered by the
 installer and verified by double-click and second-instance forwarding.
 
 1.0.3 changed the installer only: `src-tauri/nsis/hooks.nsh` now tells the shell
@@ -117,6 +116,8 @@ trade-off, so each needs an explicit decision.
 | Replace edits the source and is disabled in Read Mode | The preview is derived; rewriting it would break what "Read Mode" means | Not recommended |
 | Chunked parsing replicates reference definitions into each chunk | Keeps links working across boundaries; costs a little extra parse work on definition-heavy files | A two-pass parse that resolves definitions globally before rendering |
 | Tabs are capped at 50 with a confirmation prompt | Prevents unbounded session files and memory growth | Raise or remove the limit; check session size and restore time |
+| Comments are block-form only, one blockquote after the annotated paragraph | Inline markers such as `{==text==}{>>note<<}` do not survive the Markdown parser: a note containing `$`, `*`, `[` or `|` degrades to literal text, so it would silently break for exactly the notes worth writing | A custom remark plugin with a dedicated inline node type, plus formatting, escaping and sanitizer work |
+| Comments have no ids, status or edit/remove UI | v1 has no surface for them, and an offset-derived id silently targets the wrong block after an edit above it | A real anchor model (content hash or persisted id) and UI to manage it |
 
 ---
 

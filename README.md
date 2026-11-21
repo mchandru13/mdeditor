@@ -84,7 +84,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 213 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
+| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 285 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
 | `Release` | a `v*` tag, or manual dispatch | builds the NSIS and MSI installers; on a tag, publishes them as a GitHub Release with checksums |
 
 A manual `Release` run builds the installers and keeps them as workflow artifacts without publishing, which is the way to test packaging changes.
@@ -131,7 +131,7 @@ A native Windows menu bar exposes every action and its accelerator:
 | Menu | Items |
 |---|---|
 | File | New (Ctrl+N), Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, Print… (Ctrl+P), Exit |
-| Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F), Replace… (Ctrl+H) |
+| Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F), Replace… (Ctrl+H), Add Comment… (Ctrl+Alt+M) |
 | View | Read Mode (Ctrl+1), Edit Mode (Ctrl+2), Split Mode (Ctrl+3), Toggle Contents, Toggle Sync Scroll, Toggle Spell Check, Theme ▸ Light / Dark / System |
 | Help | Keyboard Shortcuts, About Markdown Editor |
 
@@ -186,12 +186,13 @@ Switching modes never reloads from disk, never discards edits and never creates 
 | Ctrl+1 / Ctrl+2 / Ctrl+3 | Read / Edit / Split |
 | Ctrl+F | Search in the current document |
 | Ctrl+H | Find and replace |
+| Ctrl+Alt+M | Add a comment to the selected text |
 | Enter / Shift+Enter | Next / previous match (while search is open) |
 | Ctrl+S | Save |
 | Ctrl+Shift+S | Save As |
 | Ctrl+O | Open file |
 | Ctrl+W | Close tab |
-| Escape | Dismiss search or the URL dialog |
+| Escape | Dismiss search or a dialog |
 
 Shortcuts are suppressed while a modal dialog has focus. In Edit Mode, `Ctrl+F` opens the application search rather than CodeMirror's own panel, which is deliberately not installed.
 
@@ -200,6 +201,43 @@ Shortcuts are suppressed while a modal dialog has focus. In Edit Mode, `Ctrl+F` 
 Search is application-owned. In Read and Split modes it matches rendered text nodes and highlights them with the CSS Custom Highlight API (falling back to `<mark>` elements). In Edit Mode it searches the Markdown source and selects matches in the editor. Matching stops at 5,000 results; the count then reads `5000+` while navigation continues to work.
 
 **Replace** (Ctrl+H, or Edit → Replace…) adds a second row with Replace and Replace All. Replacement edits the Markdown source, respects the case-sensitivity toggle, is undoable, and is disabled in Read Mode with a note pointing at Edit/Split — the preview itself is never mutated. The current match index is preserved while replacing, so repeated Replace walks the document.
+
+### Comments
+
+Comments are written into the Markdown file itself, as a blockquote that starts
+with a `[!comment]` marker (the same shape Obsidian uses for a callout), so any
+editor or assistant reading the file sees the note next to the text it refers to:
+
+```markdown
+The cache is invalidated on write.
+
+> [!comment] chand 2026-11-21
+>
+> Is this safe when the write fails halfway through?
+```
+
+Select text in Edit or Split Mode and choose **Edit → Add Comment…**
+(Ctrl+Alt+M). The comment is inserted immediately after the selected paragraph,
+and a blank line separates it from what follows.
+
+- The marker must own its paragraph, so `> [!comment] header` is followed by a
+  `>` line before the body. A quoted sentence that merely contains the marker is
+  ordinary prose.
+- Comments attach to top-level blocks only. Selections inside a list, table,
+  blockquote or code block are refused with a message rather than mis-anchored to
+  something the user did not select. The anchor is the editor selection: text
+  selected in the preview has no source offsets, so it is refused too.
+- A comment body is ordinary sanitized Markdown (bold, links and inline math
+  render normally), stored one `> ` level deep and capped at 4 KB including
+  quoting. A header is a single line of at most 120 characters.
+- Comments are excluded from word and character counts and from the outline, and
+  are skipped by in-document search in Read/Split Mode (Edit Mode searches the
+  raw source, so it still finds them).
+- **Export HTML removes comments**: they are editorial notes, not part of the
+  artifact being handed over. Copy HTML and Print show the rendered document as
+  displayed, including comments.
+- Removing a comment is a normal edit — delete the blockquote. Comment bodies are
+  not re-parsed to rebuild the document, so nothing else changes.
 
 ### External changes
 
@@ -212,7 +250,7 @@ Light, dark and system themes are available from the toolbar; System mode follow
 ### Export
 
 - **Copy HTML** copies the rendered fragment currently displayed, not a standalone page.
-- **Export HTML** writes a self-contained `.html` file: inlined layout and highlighting CSS, KaTeX stylesheet and `woff2` fonts as data URLs, rendered Mermaid SVG, embedded local images and a no-script Content-Security-Policy meta tag. Exports over 25 MB are refused with the projected size instead of writing an unexpectedly large file. The result is reported (bytes, images embedded or left remote, diagrams rendered or failed), and remote images remain remote rather than being silently dropped.
+- **Export HTML** writes a self-contained `.html` file: inlined layout and highlighting CSS, KaTeX stylesheet and `woff2` fonts as data URLs, rendered Mermaid SVG, embedded local images and a no-script Content-Security-Policy meta tag. Comment blocks are stripped first (see Comments above). Exports over 25 MB are refused with the projected size instead of writing an unexpectedly large file. The result is reported (bytes, images embedded or left remote, diagrams rendered or failed), and remote images remain remote rather than being silently dropped.
 
 ## Architecture
 
@@ -223,7 +261,8 @@ src/
   state/         documents.ts (per-tab reducer), session.ts (versioned persistence)
   hooks/         useDocumentRender, useScrollSpy, useShortcuts, useTheme, useDebounce
   lib/           markdownPipeline.ts, markdownWorker.ts, renderClient.ts,
-                 exportHtml.ts, search.ts, slug.ts, assetResolver.ts, encoding.ts
+                 exportHtml.ts, search.ts, comments.ts, slug.ts, assetResolver.ts,
+                 encoding.ts
   platform/      index.ts (interface), tauri.ts, fake.ts, choose.ts
   styles/        tokens.css, app.css, viewer.css, editor.css, print.css
 src-tauri/src/   lib.rs (commands, window lifecycle), paths.rs, remote.rs, settings.rs
@@ -287,7 +326,7 @@ Lighthouse cannot interact with the application, so this measures the **empty wo
 ## Testing
 
 ```bash
-npm test        # 213 tests (Vitest + React Testing Library, jsdom)
+npm test        # 285 tests (Vitest + React Testing Library, jsdom)
 npm run test:rust  # 36 tests (cargo test)
 ```
 
@@ -342,14 +381,14 @@ npm run check:security   # attack probes against the packaged app
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
-Re-run for 1.0.3 on 2026-11-21 (Windows, Node 24.13.0): 213 Vitest tests, 36 Rust tests, typecheck, lint, `check:ui` (18/18) and `npm audit` (0 vulnerabilities) all pass. `check:app` and `check:e2e` date from the 1.0.2 build and were not re-run for 1.0.3.
+Re-run for 1.0.3 on 2026-11-21 (Windows, Node 24.13.0): 213 Vitest tests at the time (the suite is 285 after the comment feature), 36 Rust tests, typecheck, lint, `check:ui` (18/18) and `npm audit` (0 vulnerabilities) all pass. `check:app` and `check:e2e` date from the 1.0.2 build and were not re-run for 1.0.3.
 
 | Check | Command | Result |
 |---|---|---|
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 213 passed |
+| Unit and integration tests | `npm test` | 285 passed |
 | Native tests | `npm run test:rust` | 36 passed |
 | File association | double-click a `.md` in Explorer | launches the app with that file; second file forwards to the running window (verified: 1 process, tab added) |
 | Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |

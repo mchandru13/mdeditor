@@ -193,3 +193,71 @@ describe('KaTeX font inlining', () => {
     expect(css).not.toMatch(/url\(["']?fonts\//);
   });
 });
+
+describe('standalone HTML export: comments', () => {
+  it('removes editorial comments from the exported artifact', async () => {
+    const source = [
+      'Body text.',
+      '',
+      '> [!comment] chand',
+      '>',
+      '> Internal note that should not ship.',
+      '',
+    ].join('\n');
+    const tree = renderMarkdown(source, {
+      base: { kind: 'none' },
+      assetOrigin: 'http://asset.localhost',
+      disableRichContent: false,
+    }).hast;
+
+    const { html } = await buildStandaloneHtml({ ...baseOptions, tree });
+    expect(html).toContain('Body text.');
+    expect(html).not.toContain('Internal note');
+    expect(html).not.toContain('mdeditor-comment');
+    expect(html).not.toContain('[!comment]');
+  });
+});
+
+describe('standalone HTML export: comment boundaries', () => {
+  async function exportOf(source: string) {
+    const tree = renderMarkdown(source, {
+      base: { kind: 'none' },
+      assetOrigin: 'http://asset.localhost',
+      disableRichContent: false,
+    }).hast;
+    return (await buildStandaloneHtml({ ...baseOptions, tree })).html;
+  }
+
+  it('keeps a quote whose second paragraph looks like a marker', async () => {
+    const html = await exportOf('> - keep this list item\n>\n> [!comment] note\n');
+    expect(html).toContain('keep this list item');
+    expect(html).toContain('[!comment]');
+  });
+
+  it('keeps a soft-wrapped marker, which is quoted prose', async () => {
+    const html = await exportOf('> [!comment] chand\n> internal note\n');
+    expect(html).toContain('internal note');
+  });
+});
+
+describe('standalone HTML export: canonical comment form', () => {
+  async function exportOf(source: string) {
+    const tree = renderMarkdown(source, {
+      base: { kind: 'none' },
+      assetOrigin: 'http://asset.localhost',
+      disableRichContent: false,
+    }).hast;
+    return (await buildStandaloneHtml({ ...baseOptions, tree })).html;
+  }
+
+  it('keeps content under a marker with a formatted header and a note', async () => {
+    const html = await exportOf('> [!comment] **chand**\n> internal note\n');
+    expect(html).toContain('internal note');
+    expect(html).toContain('[!comment]');
+  });
+
+  it('keeps a heading under a marker-only blockquote', async () => {
+    const html = await exportOf('> [!comment] x\n> # keep this heading\n');
+    expect(html).toContain('keep this heading');
+  });
+});

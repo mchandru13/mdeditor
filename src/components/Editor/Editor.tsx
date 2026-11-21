@@ -20,6 +20,14 @@ export interface EditorHandle {
   focus(): void;
   scrollTo(position: number): void;
   selectRange(start: number, end: number): void;
+  /** Current selection as sorted source offsets, or null when there is no view. */
+  getSelection(): { from: number; to: number } | null;
+  /**
+   * Replaces a source range as one transaction, leaving the existing selection
+   * mapped. Used by commands that edit around the selection (adding a comment,
+   * for example) so the change is undoable and does not replace the whole buffer.
+   */
+  replaceRange(from: number, to: number, text: string): void;
   getScrollTop(): number;
   restoreScroll(top: number): void;
   /** 1-based line currently at the top of the viewport. */
@@ -162,10 +170,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     if (current === value) return;
 
     const selection = view.state.selection.main;
-    // Only the first load of a restored tab is kept out of the history, and only
-    // when there is nothing to lose: replacing the whole buffer here is also how
-    // Edit > Replace and Replace All arrive, and those must stay undoable.
-    const noHistory = undoDepth(view.state) === 0;
+    // Loading a restored document into an empty editor is not an edit: keeping it
+    // out of history stops Ctrl+Z from emptying the tab. Any change to existing
+    // content is a real edit and must be undoable — including the first one after
+    // opening a file, where the history is still empty.
+    const noHistory = current.length === 0 && value.length > 0 && undoDepth(view.state) === 0;
     view.dispatch({
       changes: { from: 0, to: current.length, insert: value },
       selection: { anchor: Math.min(selection.anchor, value.length) },
@@ -212,6 +221,22 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         scrollIntoView: true,
       });
       view.focus();
+    },
+    getSelection() {
+      const view = viewRef.current;
+      if (!view) return null;
+      const { from, to } = view.state.selection.main;
+      return { from, to };
+    },
+    replaceRange(from: number, to: number, text: string) {
+      const view = viewRef.current;
+      if (!view) return;
+      const length = view.state.doc.length;
+      const start = Math.max(0, Math.min(from, length));
+      const end = Math.max(start, Math.min(to, length));
+      // No explicit selection: CodeMirror maps the existing one, so the text the
+      // user selected stays selected after the comment appears below it.
+      view.dispatch({ changes: { from: start, to: end, insert: text } });
     },
     getScrollTop() {
       return viewRef.current?.scrollDOM.scrollTop ?? 0;

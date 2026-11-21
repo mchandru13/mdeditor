@@ -10,7 +10,12 @@ import { toHtml } from 'hast-util-to-html';
 import { visit } from 'unist-util-visit';
 import type { Element, Root } from 'hast';
 
-import { MERMAID_CLASS, MATH_DISPLAY_CLASS, MATH_INLINE_CLASS } from './markdownPipeline';
+import {
+  COMMENT_CLASS,
+  MERMAID_CLASS,
+  MATH_DISPLAY_CLASS,
+  MATH_INLINE_CLASS,
+} from './markdownPipeline';
 import { isSafeSvg } from './svgSafety';
 
 export const EXPORT_LIMIT_BYTES = 25 * 1024 * 1024;
@@ -55,6 +60,26 @@ export class ExportTooLargeError extends Error {
 }
 
 export { isSafeSvg };
+
+/**
+ * Removes comment blockquotes from the exported tree.
+ *
+ * Exported HTML is the artifact you hand to someone else; the author's editorial
+ * notes do not belong in it, and keeping them would also mean inventing styling
+ * for a surface with no design intent.
+ */
+function stripCommentBlocks(tree: Root): void {
+  visit(tree, 'element', (node: Element, index, parent) => {
+    if (!parent || index === undefined || index === null) return;
+    if (node.tagName !== 'blockquote') return;
+    const classes = node.properties?.className;
+    if (!Array.isArray(classes) || !classes.map(String).includes(COMMENT_CLASS)) return;
+    // `index` shifts the visit cursor so the sibling that slides into this slot
+    // is still examined.
+    parent.children.splice(index, 1);
+    return index;
+  });
+}
 
 function textOfEl(node: Element): string {
   return node.children
@@ -108,6 +133,10 @@ export async function buildStandaloneHtml(options: ExportOptions): Promise<{
 }> {
   const limit = options.limitBytes ?? EXPORT_LIMIT_BYTES;
   const tree = structuredClone<Root>(options.tree);
+
+  // Comments are editorial notes for the author, not part of the document being
+  // handed over, so they are removed from the exported artifact.
+  stripCommentBlocks(tree);
 
   const report: ExportReport = {
     bytes: 0,

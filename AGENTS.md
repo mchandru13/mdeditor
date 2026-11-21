@@ -122,7 +122,7 @@ Changing anything above requires updating `README.md` §Security and
 Run what the change touches; run more when unsure.
 
 ```bash
-npm test                 # 213 Vitest tests
+npm test                 # 285 Vitest tests
 npm run test:rust        # 36 cargo tests
 npm run typecheck && npm run lint && npm run build
 npm run check:ui         # needs `npm run preview` on :4173 and Edge

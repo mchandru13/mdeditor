@@ -1,4 +1,4 @@
-import { createRef } from 'react';
+import { createRef, type RefObject } from 'react';
 import { describe, expect, it } from 'vitest';
 import { act, render } from '@testing-library/react';
 import { EditorView } from '@codemirror/view';
@@ -6,10 +6,10 @@ import { undo, undoDepth } from '@codemirror/commands';
 
 import { Editor, type EditorHandle } from '../../src/components/Editor/Editor';
 
-function element(docId: string, value: string) {
+function element(ref: RefObject<EditorHandle | null>, docId: string, value: string) {
   return (
     <Editor
-      ref={createRef<EditorHandle>()}
+      ref={ref}
       docId={docId}
       value={value}
       onChange={() => undefined}
@@ -19,12 +19,18 @@ function element(docId: string, value: string) {
 }
 
 function mount(docId: string, value: string) {
-  const view = render(element(docId, value));
+  const ref = createRef<EditorHandle>();
+  const view = render(element(ref, docId, value));
   const host = view.container.querySelector('.editor-host, .editor, div');
   if (!host) throw new Error('editor host missing');
   const editor = EditorView.findFromDOM(host as HTMLElement);
   if (!editor) throw new Error('editor view not mounted');
-  return { rerender: view.rerender, editor };
+  return {
+    editor,
+    ref,
+    rerender: (nextDocId: string, nextValue: string) =>
+      view.rerender(element(ref, nextDocId, nextValue)),
+  };
 }
 
 describe('editor undo history', () => {
@@ -36,7 +42,7 @@ describe('editor undo history', () => {
     });
     expect(undoDepth(editor.state)).toBe(1);
 
-    rerender(element('b', 'BBBB'));
+    rerender('b', 'BBBB');
     expect(editor.state.doc.toString()).toBe('BBBB');
     // The outgoing document's history must be gone, not merely remapped.
     expect(undoDepth(editor.state)).toBe(0);
@@ -61,7 +67,7 @@ describe('editor undo history', () => {
     const { rerender, editor } = mount('c', '');
 
     // First load of a restored tab: nothing to lose, so it stays out of history.
-    rerender(element('c', 'loaded from disk'));
+    rerender('c', 'loaded from disk');
     expect(editor.state.doc.toString()).toBe('loaded from disk');
     expect(undoDepth(editor.state)).toBe(0);
     act(() => {
@@ -74,8 +80,42 @@ describe('editor undo history', () => {
     act(() => {
       editor.dispatch({ changes: { from: 0, insert: 'note: ' }, userEvent: 'input.type' });
     });
-    rerender(element('c', 'replaced by Replace All'));
+    rerender('c', 'replaced by Replace All');
     expect(editor.state.doc.toString()).toBe('replaced by Replace All');
     expect(undoDepth(editor.state)).toBeGreaterThan(0);
+  });
+
+  it('keeps the first edit after opening a file undoable', () => {
+    const { rerender, editor } = mount('d', 'from disk');
+    // Loading into a non-empty buffer is not a load: the history is empty here
+    // only because the document was swapped in, and the user's first edit must
+    // still be undoable.
+    expect(undoDepth(editor.state)).toBe(0);
+
+    rerender('d', 'from disk\n\n> [!comment] me\n>\n> note\n');
+    expect(editor.state.doc.toString()).toContain('[!comment]');
+    expect(undoDepth(editor.state)).toBeGreaterThan(0);
+
+    act(() => {
+      undo(editor);
+    });
+    expect(editor.state.doc.toString()).toBe('from disk');
+  });
+
+  it('makes a range replacement undoable even in an empty document', () => {
+    const { ref, editor } = mount('e', '');
+
+    act(() => {
+      ref.current!.replaceRange(0, 0, '> [!comment] me\n');
+    });
+    expect(editor.state.doc.toString()).toBe('> [!comment] me\n');
+    // This is how Add Comment applies its edit: one transaction, so undo works
+    // where the value-prop path would treat it as a restored load.
+    expect(undoDepth(editor.state)).toBeGreaterThan(0);
+
+    act(() => {
+      undo(editor);
+    });
+    expect(editor.state.doc.toString()).toBe('');
   });
 });

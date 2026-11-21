@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 
 import { DocumentTabs } from './components/DocumentTabs/DocumentTabs';
 import { UrlDialog } from './components/Dialogs/UrlDialog';
+import { CommentDialog } from './components/Dialogs/CommentDialog';
 import { InfoDialog, type InfoDialogKind } from './components/Dialogs/InfoDialog';
 import { SplitDivider } from './components/Divider/SplitDivider';
 import { Editor, type EditorHandle } from './components/Editor/EditorLazy';
@@ -17,6 +18,7 @@ import { useScrollSpy } from './hooks/useScrollSpy';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useTheme } from './hooks/useTheme';
 import { detectEncoding, toEditorText, toFileText } from './lib/encoding';
+import { findInsertPoint, insertBlockComment } from './lib/comments';
 import { escapeSelector } from './lib/dom';
 import { buildStandaloneHtml, ExportTooLargeError, formatReport } from './lib/exportHtml';
 import { EXPORT_CSS } from './lib/exportStyles';
@@ -85,6 +87,12 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const [activeMatch, setActiveMatch] = useState(0);
 
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+  const [commentDialog, setCommentDialog] = useState<{
+    source: string;
+    from: number;
+    to: number;
+    target: string;
+  } | null>(null);
   const [infoDialog, setInfoDialog] = useState<InfoDialogKind | null>(null);
   const [urlBusy, setUrlBusy] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -591,6 +599,94 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     setMessage(`Replaced ${count} occurrence${count === 1 ? '' : 's'}.`);
   }, [caseSensitive, doc, mode, query, replacement]);
 
+  /* ---------------------------------------------------------------- comments */
+
+  /**
+   * Opens the comment dialog for the current selection.
+   *
+   * Comments are anchored to top-level blocks only: a blockquote placed after a
+   * list item leaves the list, which would silently attach the note to the whole
+   * list instead of the item the user selected, so those selections are refused
+   * with a message rather than mis-anchored.
+   */
+  const startComment = useCallback(() => {
+    // Read the document from the ref so this callback is stable across edits:
+    // it is a dependency of the native-menu effect, and rebuilding that effect
+    // on every keystroke leaks a menu subscription per edit.
+    const current = activeDocument(stateRef.current);
+    if (!current) return;
+    if (mode === 'read') {
+      setMessage('Switch to Edit or Split mode to add a comment.');
+      return;
+    }
+
+    // Without a mounted editor there is no selection to read; inventing offsets
+    // would anchor the comment to the document start instead of the user's text.
+    const selection = editorRef.current?.getSelection() ?? null;
+    if (!selection) {
+      setMessage('The editor is not ready yet. Try again in a moment.');
+      return;
+    }
+
+    // A click in the preview creates a DOM selection that has no source offsets;
+    // the editor still holds whatever caret it had last. Refuse rather than
+    // comment that stale caret.
+    const domSelection = window.getSelection();
+    const anchor = domSelection?.anchorNode;
+    const anchorElement =
+      anchor?.nodeType === Node.ELEMENT_NODE ? (anchor as Element) : anchor?.parentElement;
+    if (anchorElement?.closest('.markdown-body')) {
+      setMessage('Select the text in the editor to anchor a comment to it.');
+      return;
+    }
+
+    const point = findInsertPoint(current.source, selection.from, selection.to);
+    if (!point) {
+      setMessage('Comments attach to ordinary paragraphs. Select text outside a list, table, quote or code block.');
+      return;
+    }
+
+    setCommentDialog({
+      source: current.source,
+      from: selection.from,
+      to: selection.to,
+      target: anchorLabel(current.source, point.anchorEnd),
+    });
+  }, [mode]);
+
+  const submitComment = useCallback(
+    (comment: { header: string; body: string }) => {
+      if (!doc || !commentDialog) return;
+      // The native menu can open another document, or undo, while the dialog is
+      // up. Offsets from the old source would anchor the comment to a different
+      // block, so refuse instead of guessing.
+      if (commentDialog.source !== doc.source) {
+        setMessage('The document changed while the dialog was open. Try again.');
+        setCommentDialog(null);
+        return;
+      }
+
+      const point = findInsertPoint(doc.source, commentDialog.from, commentDialog.to);
+      if (!point) {
+        setMessage('That selection can no longer be commented.');
+        setCommentDialog(null);
+        return;
+      }
+
+      const inserted = insertBlockComment(doc.source, point, comment.header, comment.body);
+      // Apply as one CodeMirror transaction: routing the text through the value
+      // prop looks like an external load of an empty buffer, which is kept out of
+      // history, so Ctrl+Z would not undo the comment.
+      const editor = editorRef.current;
+      if (editor) editor.replaceRange(inserted.insertion.from, inserted.insertion.to, inserted.insertion.text);
+      else dispatch({ type: 'edit', id: doc.id, source: inserted.source });
+
+      setCommentDialog(null);
+      setMessage('Comment added to the document.');
+    },
+    [commentDialog, doc],
+  );
+
   /* ---------------------------------------------------------------- shortcuts */
 
   const shortcuts = useMemo(
@@ -616,16 +712,18 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         if (current) void saveDocument(current, true);
       },
       'mod+o': () => void openFromDialog(),
+      'mod+alt+m': () => startComment(),
       'mod+w': () => {
         const current = activeDocument(stateRef.current);
         if (current) void closeDocument(current.id);
       },
       escape: () => {
         if (searchOpen) closeSearch();
+        else if (commentDialog) setCommentDialog(null);
         else if (urlDialogOpen) setUrlDialogOpen(false);
       },
     }),
-    [closeDocument, closeSearch, newDocument, openFromDialog, saveDocument, searchOpen, urlDialogOpen],
+    [closeDocument, closeSearch, newDocument, openFromDialog, saveDocument, searchOpen, urlDialogOpen, startComment, commentDialog],
   );
 
   useShortcuts(shortcuts);
@@ -825,6 +923,9 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
           setReplaceVisible(true);
           setSearchOpen(true);
           break;
+        case 'edit.comment':
+          startComment();
+          break;
         case 'view.read':
           setMode('read');
           break;
@@ -872,6 +973,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     openFromDialog,
     platform,
     saveDocument,
+    startComment,
   ]);
   /* ------------------------------------------------------- external changes */
 
@@ -1109,6 +1211,14 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
           message={null}
         />
 
+        {commentDialog ? (
+          <CommentDialog
+            onCancel={() => setCommentDialog(null)}
+            onSubmit={submitComment}
+            target={commentDialog.target}
+          />
+        ) : null}
+
         {urlDialogOpen ? (
           <UrlDialog
             onCancel={() => {
@@ -1131,4 +1241,21 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Last non-blank source line before an anchor offset, for the dialog's
+ * "Attached after" label. `anchorEnd` may sit on a blank line, so this steps
+ * back to the block's first line: naming the last wrapped line of a paragraph
+ * would show a mid-sentence fragment instead of the paragraph.
+ */
+function anchorLabel(source: string, anchorEnd: number): string {
+  const lines = source.slice(0, anchorEnd).split('\n');
+  let end = lines.length - 1;
+  while (end >= 0 && (lines[end] ?? '').trim() === '') end -= 1;
+  if (end < 0) return '(start of document)';
+  let start = end;
+  while (start > 0 && (lines[start - 1] ?? '').trim() !== '') start -= 1;
+  const text = (lines[start] ?? '').trim();
+  return text.length > 60 ? `${text.slice(0, 57)}…` : text;
 }

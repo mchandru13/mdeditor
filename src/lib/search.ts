@@ -18,7 +18,9 @@ export interface SourceMatch {
 }
 
 const SKIPPED_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT']);
-const SKIPPED_CLASSES = ['mdeditor-mermaid', 'mdeditor-math-inline', 'mdeditor-math-display', 'mdeditor-katex'];
+// Comments are editorial: they are styled as notes and left out of search in
+// Read/Split Mode, matching their exclusion from statistics and export.
+const SKIPPED_CLASSES = ['mdeditor-mermaid', 'mdeditor-math-inline', 'mdeditor-math-display', 'mdeditor-katex', 'mdeditor-comment'];
 
 export const DEFAULT_MATCH_LIMIT = 5000;
 

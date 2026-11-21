@@ -129,6 +129,27 @@
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
+/* A comment travels in the document as a callout blockquote. It is styled to
+   read as an annotation rather than as quoted material. */
+.markdown-body blockquote.mdeditor-comment {
+  border-left-color: var(--accent);
+  background: var(--bg-elevated);
+  font-size: 0.95em;
+}
+
+.markdown-body .mdeditor-comment-header {
+  margin: 0 0 0.35em;
+  color: var(--accent);
+  font-size: 0.8em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.markdown-body .mdeditor-comment-header:empty {
+  display: none;
+}
+
 .markdown-body hr {
   height: 1px;
   border: 0;

@@ -7,6 +7,7 @@ import {
   MATH_INLINE_CLASS,
   renderMarkdown,
 } from '../../src/lib/markdownPipeline';
+import { commentBlockStarts } from '../../src/lib/comments';
 import type { RenderOptions } from '../../src/lib/types';
 
 const OPTIONS: RenderOptions = {
@@ -197,5 +198,192 @@ describe('markdown pipeline: resources', () => {
   it('keeps the alt text visible when a remote image is blocked', () => {
     const output = render('![a chart](https://attacker.test/c.png)', { base: { kind: 'none' } });
     expect(toHtml(output.hast)).toContain('a chart');
+  });
+});
+
+describe('markdown pipeline: comments', () => {
+  const COMMENT = '> [!comment] chand 2026-11-21\n>\n> Is this safe?\n';
+
+  it('marks a comment blockquote so it can be styled', () => {
+    const output = html(`${COMMENT}`);
+    expect(output).toContain('class="mdeditor-comment"');
+    expect(output).toContain('mdeditor-comment-header');
+    expect(output).toContain('chand 2026-11-21');
+    expect(output).toContain('Is this safe?');
+  });
+
+  it('drops the marker text from the rendered header', () => {
+    expect(html(COMMENT)).not.toContain('[!comment]');
+  });
+
+  it('leaves an ordinary blockquote alone', () => {
+    const output = html('> just a quote\n');
+    expect(output).not.toContain('mdeditor-comment');
+  });
+
+  it('leaves a quoted marker mid-sentence alone', () => {
+    const output = html('> He wrote [!comment] in the margin.\n');
+    expect(output).not.toContain('mdeditor-comment');
+  });
+
+  it('does not treat a comment inside a fence as a comment', () => {
+    const output = html(['```', '> [!comment] x', '> body', '```', ''].join('\n'));
+    expect(output).not.toContain('mdeditor-comment');
+    expect(output).toContain('[!comment]');
+  });
+
+  it('excludes comment text from the word count', () => {
+    const withComment = render(`one two three\n\n${COMMENT}`);
+    const withoutComment = render('one two three\n');
+    expect(withComment.stats.words).toBe(withoutComment.stats.words);
+  });
+
+  it('sanitizes markup inside a comment body like any other document text', () => {
+    const output = html('> [!comment]\n>\n> **bold** and [x](https://e.test)\n');
+    expect(output).toContain('<strong>bold</strong>');
+    expect(output).toContain('href="https://e.test"');
+  });
+
+  it('does not let a comment inject script', () => {
+    const output = html('> [!comment]\n>\n> <script>alert(1)</script>\n');
+    expect(output).not.toContain('<script');
+  });
+});
+
+describe('markdown pipeline: comment vs quote boundaries', () => {
+  it('keeps inline formatting in the header', () => {
+    const output = html('> [!comment] **chand** 2026-11-21\n>\n> body\n');
+    expect(output).toContain('mdeditor-comment-header');
+    expect(output).toContain('<strong>chand</strong>');
+    expect(output).not.toContain('[!comment]');
+  });
+
+  it('does not tag a quote whose second paragraph is a marker', () => {
+    const source = '> - keep this list item\n>\n> [!comment] note\n';
+    const output = html(source);
+    expect(output).not.toContain('mdeditor-comment');
+    expect(output).toContain('keep this list item');
+    // The list item is real content, so it is counted.
+    expect(render(source).stats.words).toBeGreaterThan(0);
+  });
+
+  it('does not tag a soft-wrapped marker, matching the source scanner', () => {
+    const output = html('> [!comment] chand\n> internal note\n');
+    expect(output).not.toContain('mdeditor-comment');
+    expect(output).toContain('[!comment]');
+  });
+
+  it('does not put a heading inside a comment in the outline', () => {
+    const output = render('> [!comment]\n>\n> # Not a section\n>\n> body\n');
+    expect(output.headings).toHaveLength(0);
+  });
+});
+
+describe('markdown pipeline: comment canonical form', () => {
+  it('keeps a list under a marker-only blockquote', () => {
+    const source = '> [!comment] x\n> - keep this item\n';
+    const output = render(source);
+    expect(toHtml(output.hast)).not.toContain('mdeditor-comment');
+    expect(output.stats.words).toBeGreaterThan(0);
+  });
+
+  it('keeps content when a formatted header is followed by a note', () => {
+    const source = '> [!comment] **chand**\n> internal note\n';
+    const output = render(source);
+    expect(toHtml(output.hast)).not.toContain('mdeditor-comment');
+    expect(output.stats.words).toBeGreaterThan(0);
+  });
+
+  it('keeps a code fence under a marker-only blockquote', () => {
+    const source = '> [!comment] x\n> ```\n> code\n> ```\n';
+    expect(toHtml(render(source).hast)).not.toContain('mdeditor-comment');
+  });
+
+  it('still marks the canonical form with a formatted header', () => {
+    const output = html('> [!comment] **chand**\n>\n> body\n');
+    expect(output).toContain('mdeditor-comment-header');
+    expect(output).toContain('<strong>chand</strong>');
+    expect(output).not.toContain('[!comment]');
+  });
+});
+
+describe('markdown pipeline: comment agreement', () => {
+  function taggedComments(source: string): number {
+    let count = 0;
+    visitTree(render(source).hast);
+    return count;
+
+    function visitTree(node: { type: string; tagName?: string; properties?: unknown; children?: unknown[] }) {
+      if (node.type === 'element' && node.tagName === 'blockquote') {
+        const classes = (node.properties as { className?: unknown } | undefined)?.className;
+        if (Array.isArray(classes) && classes.map(String).includes('mdeditor-comment')) count += 1;
+      }
+      for (const child of (node.children ?? []) as typeof node[]) visitTree(child);
+    }
+  }
+
+  it('tags exactly the blocks the source scanner calls comments', () => {
+    const docs = [
+      '> [!comment] chand\n>\n> body\n',
+      '> [!comment]\n',
+      '> [!comment] chand\n> internal note\n',
+      '> [!comment] **chand**\n> internal note\n',
+      '> [!comment] x\n> - list item\n',
+      '> [!comment] x\n>\n> - list item\n',
+      '```\n> [!comment] x\n>\n> body\n```\n',
+      '> [!comment] a\n>\n> one\n\n> [!comment] b\n>\n> two\n',
+      'plain\n\n> quote\n\n> [!comment] me\n>\n> body\n',
+    ];
+    for (const source of docs) {
+      expect(taggedComments(source)).toBe(commentBlockStarts(source).length);
+    }
+  });
+
+  it('reports outline lines that do not drift past a comment heading', () => {
+    const source = [
+      '# Real one',
+      '',
+      '> [!comment] me',
+      '>',
+      '> # Inside comment',
+      '>',
+      '> body',
+      '',
+      '# Real two',
+      '',
+    ].join('\n');
+    const output = render(source);
+    expect(output.headings.map((heading) => heading.text)).toEqual(['Real one', 'Real two']);
+    expect(output.headings[1]?.line).toBe(9);
+  });
+});
+
+describe('markdown pipeline: comment scanner over-approximation', () => {
+  it('declines to tag a scanned block whose marker is not text, hiding nothing', () => {
+    const source = '[!comment]: https://e.test\n\n> [!comment]\n>\n> internal note\n';
+    expect(commentBlockStarts(source)).toHaveLength(1);
+    const output = render(source);
+    expect(toHtml(output.hast)).not.toContain('mdeditor-comment');
+    expect(output.stats.words).toBeGreaterThan(0);
+  });
+
+  it('declines to tag a marker line that parses as indented code', () => {
+    const source = '>     [!comment] x\n>\n> body\n';
+    expect(commentBlockStarts(source)).toHaveLength(1);
+    const output = render(source);
+    expect(toHtml(output.hast)).not.toContain('mdeditor-comment');
+    expect(output.stats.words).toBeGreaterThan(0);
+  });
+});
+
+describe('markdown pipeline: comment statistics', () => {
+  it('does not count a blocked remote-image placeholder inside a comment', () => {
+    const withComment = render(
+      'Body text.\n\n> [!comment] me\n>\n> ![diagram](https://example.com/a.png)\n',
+    );
+    const withoutComment = render('Body text.\n');
+    expect(withComment.placeholders.blockedRemoteImages).toBe(1);
+    expect(withComment.stats.words).toBe(withoutComment.stats.words);
+    expect(withComment.stats.characters).toBe(withoutComment.stats.characters);
   });
 });

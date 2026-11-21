@@ -54,6 +54,14 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "edit.find", "Find…", true, Some("CmdOrCtrl+F"))?,
             &MenuItem::with_id(app, "edit.replace", "Replace…", true, Some("CmdOrCtrl+H"))?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(
+                app,
+                "edit.comment",
+                "Add Comment…",
+                true,
+                Some("CmdOrCtrl+Alt+M"),
+            )?,
         ],
     )?;
 

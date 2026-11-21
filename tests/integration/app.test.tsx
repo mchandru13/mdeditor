@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle } from 'react';
+import { forwardRef, useImperativeHandle, useRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
@@ -19,10 +19,19 @@ vi.mock('../../src/components/Editor/Editor', () => {
     },
     ref,
   ) {
+    // The mock is controlled, so `replaceRange` has to apply the change through
+    // `onChange` the way the real editor's transaction does.
+    const valueRef = useRef(value);
+    valueRef.current = value;
+
     useImperativeHandle(ref, () => ({
       focus: () => undefined,
       scrollTo: () => undefined,
       selectRange: () => undefined,
+      getSelection: () => ({ from: 0, to: 0 }),
+      replaceRange: (from: number, to: number, text: string) => {
+        onChange(`${valueRef.current.slice(0, from)}${text}${valueRef.current.slice(to)}`);
+      },
       getScrollTop: () => 0,
       restoreScroll: () => undefined,
       lineAtScrollTop: () => 1,
@@ -397,6 +406,44 @@ describe('menu commands', () => {
       platform.emitMenu('edit.find');
     });
     expect(await screen.findByLabelText('Search text')).toBeInTheDocument();
+  });
+
+  it('writes a comment into the document from Edit > Add Comment', async () => {
+    const { platform } = await openFromClipboard('alpha beta\n');
+
+    // The editor is lazy-loaded; Ctrl+Alt+M needs a mounted editor to read the
+    // selection from, and refuses with a message rather than guessing offsets.
+    await screen.findByLabelText('Markdown source editor');
+
+    await act(async () => {
+      platform.emitMenu('edit.comment');
+    });
+
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Comment'), {
+      target: { value: 'why is this here?' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add comment' }));
+
+    await waitFor(() => {
+      const editor = screen.getByLabelText('Markdown source editor') as HTMLTextAreaElement;
+      expect(editor.value).toContain('alpha beta');
+      expect(editor.value).toContain('> [!comment]');
+      expect(editor.value).toContain('> why is this here?');
+    });
+  });
+
+  it('refuses to comment in Read Mode', async () => {
+    const { platform } = await openFromClipboard('# Read only\n');
+
+    await act(async () => {
+      platform.emitMenu('view.read');
+    });
+    await act(async () => {
+      platform.emitMenu('edit.comment');
+    });
+
+    expect(await screen.findByText(/Switch to Edit or Split mode/)).toBeInTheDocument();
   });
 
   it('shows the shortcut reference and About box from Help', async () => {
