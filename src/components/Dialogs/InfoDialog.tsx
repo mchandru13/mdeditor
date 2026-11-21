@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 
+import { version as APP_VERSION } from '../../../package.json';
+
 export type InfoDialogKind = 'shortcuts' | 'about';
 
 const SHORTCUTS: { keys: string; action: string }[] = [
@@ -87,7 +89,7 @@ export function InfoDialog({ kind, onClose }: InfoDialogProps) {
           </table>
         ) : (
           <>
-            <p>Markdown Editor 1.0.0</p>
+            <p>Markdown Editor {APP_VERSION}</p>
             <p className="modal-hint">
               A local-first Markdown viewer and editor built with Tauri, Rust, React and TypeScript.
               Documents are rendered with Unified, sanitized with rehype-sanitize, and nothing leaves

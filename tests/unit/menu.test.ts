@@ -3,24 +3,30 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
- * The native menu and the frontend dispatcher are two lists that must agree.
+ * The native menu and the frontend dispatcher are two hand-maintained lists that
+ * must agree.
  *
- * A menu item whose id has no `case` in `App.tsx` is a button that does
- * nothing; a `case` with no item is dead code. Neither shows up in a normal
- * test, because nothing dispatches an id that only exists on one side, so the
- * lists are compared here and `tests/integration/app.test.tsx` proves that
- * every id actually has an effect.
+ * A menu item whose id has no `case` in `App.tsx` is a button that does nothing;
+ * a `case` with no item is dead code. Neither shows up in a normal test, because
+ * an id that exists on only one side is never dispatched, so the lists are
+ * compared here. `tests/integration/app.test.tsx` proves each id has an effect,
+ * and `cargo test menu::` pins the labels and accelerators on the Rust side.
  */
 
 const menuSource = readFileSync('src-tauri/src/menu.rs', 'utf8');
-
 const appSource = readFileSync('src/App.tsx', 'utf8');
 
-/** Ids created with `MenuItem::with_id`, which are the app-owned commands. */
+/** Ids declared in the Rust `COMMANDS` table, which is what `build` renders. */
 function menuIds(): string[] {
-  const ids = [...menuSource.matchAll(/MenuItem::with_id\(\s*app,\s*"([^"]+)"/g)].map(
-    (match) => match[1]!,
-  );
+  const start = menuSource.indexOf('pub const COMMANDS');
+  const end = menuSource.indexOf('];', start);
+  expect(start).toBeGreaterThan(-1);
+  expect(end).toBeGreaterThan(start);
+  const body = menuSource.slice(start, end);
+  const ids = [...body.matchAll(/id:\s*"([^"]+)"/g)]
+    .map((match) => match[1]!)
+    // `-` is the separator marker, not a command.
+    .filter((id) => id !== '-');
   return [...new Set(ids)].sort();
 }
 
@@ -41,8 +47,10 @@ describe('native menu wiring', () => {
   });
 
   it('registers the comment command with its accelerator', () => {
-    expect(menuSource).toContain('"edit.comment"');
-    expect(menuSource).toMatch(/"edit\.comment",\s*"Add Comment…",\s*true,\s*Some\("CmdOrCtrl\+Alt\+M"\)/);
+    expect(menuIds()).toContain('edit.comment');
+    expect(menuSource).toMatch(
+      /id:\s*"edit\.comment",\s*label:\s*"Add Comment…",\s*accelerator:\s*Some\("CmdOrCtrl\+Alt\+M"\)/,
+    );
   });
 
   it('keeps the OS-provided clipboard items out of the dispatcher', () => {

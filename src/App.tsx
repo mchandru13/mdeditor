@@ -622,21 +622,21 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
     // Without a mounted editor there is no selection to read; inventing offsets
     // would anchor the comment to the document start instead of the user's text.
-    const selection = editorRef.current?.getSelection() ?? null;
-    if (!selection) {
+    const editor = editorRef.current;
+    const selection = editor?.getSelection() ?? null;
+    if (!editor || !selection) {
       setMessage('The editor is not ready yet. Try again in a moment.');
       return;
     }
 
-    // A click in the preview creates a DOM selection that has no source offsets;
-    // the editor still holds whatever caret it had last. Refuse rather than
-    // comment that stale caret.
-    const domSelection = window.getSelection();
-    const anchor = domSelection?.anchorNode;
-    const anchorElement =
-      anchor?.nodeType === Node.ELEMENT_NODE ? (anchor as Element) : anchor?.parentElement;
-    if (anchorElement?.closest('.markdown-body')) {
-      setMessage('Select the text in the editor to anchor a comment to it.');
+    // The editor is the only source of truth. `window.getSelection()` is not
+    // usable here: CodeMirror draws its own selection (drawSelection), so the
+    // DOM range can still point at the preview from an earlier click while the
+    // editor holds a perfectly good selection — a guard on it refused real
+    // selections. Requiring a non-empty editor selection instead is
+    // deterministic: a comment annotates text, so there must be some.
+    if (selection.from === selection.to) {
+      setMessage('Select the text to comment on first, then press Ctrl+Alt+M.');
       return;
     }
 
@@ -823,7 +823,15 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
       setMessage('Open the document in Read or Split mode before copying HTML.');
       return;
     }
-    await platform.copyText(body.innerHTML);
+    try {
+      await platform.copyText(body.innerHTML);
+    } catch (error) {
+      // The OS clipboard is a shared resource: another process can hold it, and
+      // the platform layer then rejects the write. Say so instead of leaving the
+      // user with a button that appears to do nothing.
+      setMessage(`Could not copy: ${describe(error)}`);
+      return;
+    }
     setMessage('Rendered HTML fragment copied to the clipboard.');
   }, [platform]);
 

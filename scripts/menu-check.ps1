@@ -35,7 +35,15 @@ try {
   $menuBarCondition = New-Object System.Windows.Automation.PropertyCondition(
     [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
     [System.Windows.Automation.ControlType]::MenuBar)
-  $bars = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $menuBarCondition)
+  # The window shows before its native menu is exposed to UI Automation, and the
+  # gap varies per launch. Poll for the menu rather than racing it.
+  $bars = $null
+  for ($attempt = 0; $attempt -lt 20; $attempt++) {
+    $bars = $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $menuBarCondition)
+    if ($bars -and $bars.Count -gt 0) { break }
+    Start-Sleep -Milliseconds 1000
+  }
+  if (-not $bars -or $bars.Count -eq 0) { throw 'menu bar not exposed by UI Automation' }
   $menus = @()
   foreach ($bar in $bars) {
     $children = $bar.FindAll(
@@ -71,31 +79,44 @@ try {
   $editNames = @()
   $addComment = $null
   if ($editItem) {
+    # UI Automation occasionally refuses to expand a menu on a freshly shown
+    # window. Retrying keeps the check meaningful instead of silently skipping
+    # the assertion it exists for.
     $expanded = $false
-    try {
-      $pattern = $editItem.GetCurrentPattern(
-        [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
-      $pattern.Expand()
-      $expanded = $true
-      Start-Sleep -Milliseconds 700
-
-      $menuItemCondition = New-Object System.Windows.Automation.PropertyCondition(
-        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-        [System.Windows.Automation.ControlType]::MenuItem)
-      $items = $editItem.FindAll(
-        [System.Windows.Automation.TreeScope]::Descendants, $menuItemCondition)
-      foreach ($item in $items) {
-        $editNames += $item.Current.Name
-        if (-not $addComment -and $item.Current.Name -like 'Add Comment*') {
-          $addComment = $item
-        }
+    for ($attempt = 0; $attempt -lt 3 -and -not $expanded; $attempt++) {
+      try {
+        $pattern = $editItem.GetCurrentPattern(
+          [System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+        $pattern.Expand()
+        Start-Sleep -Milliseconds 900
+        $expanded = $true
+      }
+      catch {
+        Start-Sleep -Milliseconds 700
       }
     }
-    catch {
-      $editNames = @()
+    if (-not $expanded) {
+      $results.Add('INFO  Edit submenu could not be expanded')
     }
-    finally {
-      if ($expanded) {
+    if ($expanded) {
+      try {
+        $menuItemCondition = New-Object System.Windows.Automation.PropertyCondition(
+          [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+          [System.Windows.Automation.ControlType]::MenuItem)
+        $items = $editItem.FindAll(
+          [System.Windows.Automation.TreeScope]::Descendants, $menuItemCondition)
+        foreach ($item in $items) {
+          $editNames += $item.Current.Name
+          if (-not $addComment -and $item.Current.Name -like 'Add Comment*') {
+            $addComment = $item
+          }
+        }
+      }
+      catch {
+        $editNames = @()
+        $results.Add("INFO  Edit submenu expand failed: $($_.Exception.Message)")
+      }
+      finally {
         try { $pattern.Collapse() } catch { }
       }
     }

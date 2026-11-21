@@ -1,15 +1,20 @@
 # Roadmap
 
-Remaining work after Markdown Editor 1.0.3. Nothing here blocks normal use: the
+Remaining work after Markdown Editor 1.1.0. Nothing here blocks normal use: the
 application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
 
-Current state: 302 TypeScript tests and 36 Rust tests pass (2026-11-21), and all
+Current state: 309 TypeScript tests and 39 Rust tests pass (2026-11-21), and all
 five packaged-app checks were re-run on this build: `check:menu` 3/3, `check:ui`
 18/18, `check:app` 10/10, `check:e2e` 18/18 and `check:security` 13/13. File
 associations for `.md` and `.markdown` are registered by the installer and
 verified by double-click and second-instance forwarding.
+
+1.1.0 adds comments that are stored in the document, and fixes three ways a
+session could lose data: a restored tab started out marked Saved (so Ctrl+S could
+write the truncated recovery copy over the original), undo leaked one tab's text
+into another, and an unreadable `settings.json` was replaced with defaults.
 
 1.0.3 changed the installer only: `src-tauri/nsis/hooks.nsh` now tells the shell
 the association changed, so an upgrade repaints Explorer's cached `.md` icon. No

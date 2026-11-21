@@ -25,12 +25,21 @@ vi.mock('../../src/components/Editor/Editor', () => {
     // `onChange` the way the real editor's transaction does.
     const valueRef = useRef(value);
     valueRef.current = value;
+    const areaRef = useRef<HTMLTextAreaElement | null>(null);
 
     useImperativeHandle(ref, () => ({
       focus: () => undefined,
       scrollTo: () => undefined,
       selectRange: () => undefined,
-      getSelection: () => ({ from: 0, to: 0 }),
+      // Mirrors the textarea's own selection, so a test that selects text is
+      // visible to the app exactly as a CodeMirror selection would be. Returning
+      // a constant hid a real bug: the app refuses a collapsed selection, and a
+      // fake `{from:0,to:0}` looked like an unselected caret.
+      getSelection: () => {
+        const area = areaRef.current;
+        if (!area) return null;
+        return { from: area.selectionStart, to: area.selectionEnd };
+      },
       replaceRange: (from: number, to: number, text: string) => {
         onChange(`${valueRef.current.slice(0, from)}${text}${valueRef.current.slice(to)}`);
       },
@@ -48,6 +57,7 @@ vi.mock('../../src/components/Editor/Editor', () => {
 
     return (
       <textarea
+        ref={areaRef}
         aria-label="Markdown source editor"
         data-spellcheck={String(spellCheck ?? true)}
         value={value}
@@ -419,7 +429,14 @@ describe('menu commands', () => {
 
     // The editor is lazy-loaded; Ctrl+Alt+M needs a mounted editor to read the
     // selection from, and refuses with a message rather than guessing offsets.
-    await screen.findByLabelText('Markdown source editor');
+    const area = (await screen.findByLabelText('Markdown source editor')) as HTMLTextAreaElement;
+
+    // Select the first paragraph, which is what the command annotates. Without a
+    // selection the command is refused on purpose: a comment has to say what it
+    // refers to.
+    act(() => {
+      area.setSelectionRange(0, 'alpha beta'.length);
+    });
 
     await act(async () => {
       platform.emitMenu('edit.comment');
@@ -1047,15 +1064,22 @@ describe('every native menu command has an observable effect', () => {
     });
     await screen.findByRole('tab', { name: /export\.md/ });
     // Export builds its tree from the live render, so the document has to be
-    // rendered first. Read Mode is the realistic path and has no editor.
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Export me' })).toBeInTheDocument();
-    });
+    // rendered first. Wait for the heading, not merely for the tab: the tab
+    // appears before the render completes, and `ensureOutput()` then returns
+    // null and Export silently does nothing.
+    await waitFor(
+      () => {
+        expect(screen.getByRole('heading', { name: 'Export me' })).toBeInTheDocument();
+      },
+      { timeout: 10000 },
+    );
 
     await act(async () => {
       platform.emitMenu('file.exportHtml');
     });
-    await waitFor(() => expect(platform.files.get('C:\\out\\export.html')).toContain('Export me'));
+    await waitFor(() => expect(platform.files.get('C:\\out\\export.html')).toContain('Export me'), {
+      timeout: 10000,
+    });
   });
 
   it('file.print asks the platform to print, and file.exit closes the window', async () => {
@@ -1101,6 +1125,12 @@ describe('every native menu command has an observable effect', () => {
 
   it('edit.comment opens the comment dialog', async () => {
     const { platform } = await openInEditMode('text to annotate\n');
+    // A comment annotates a selection, so the command deliberately refuses a
+    // collapsed caret. Select the paragraph first, as a user must.
+    const area = screen.getByLabelText('Markdown source editor') as HTMLTextAreaElement;
+    act(() => {
+      area.setSelectionRange(0, 'text to annotate'.length);
+    });
     await act(async () => {
       platform.emitMenu('edit.comment');
     });

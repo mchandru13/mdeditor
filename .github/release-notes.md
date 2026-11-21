@@ -14,6 +14,8 @@ GitHub Actions from the `v{version}` tag.
 
 - **Read / Edit / Split** modes, with the split pane scrolling in step
 - **Tabs**, each remembering its own mode, cursor and scroll position
+- **Comments that live in the file**: select text, press Ctrl+Alt+M, and the note
+  is written as a Markdown blockquote next to what it refers to
 - **GitHub-flavoured Markdown**: tables, task lists, footnotes, strikethrough, autolinks
 - **KaTeX** math and **Mermaid** diagrams, rendered locally
 - **Search and replace** with match count, case and whole-word options
@@ -21,6 +23,22 @@ GitHub Actions from the `v{version}` tag.
 - **Light / dark / follow-system** themes
 - Restores open tabs and preferences on start
 - Local files only: no telemetry, no accounts, no plugins, no remote assets in local documents
+
+## What changed in {version}
+
+- **Comments.** Select text and choose Edit → Add Comment… (Ctrl+Alt+M). The
+  note is stored in the Markdown as a `> [!comment]` blockquote, so an assistant
+  or another editor reading the file sees it beside the text it annotates.
+  Comments are excluded from search, word counts and exported HTML, and Ctrl+Z
+  undoes one in a step. Only whole paragraphs can be annotated: selections inside
+  a list, table, quote or code block are refused rather than mis-anchored.
+- **Fewer ways to lose work.** A restored tab no longer starts out marked Saved,
+  which could let Ctrl+S overwrite the original file with the truncated recovery
+  copy. Undo no longer leaks the previous tab's text into the current one. A
+  settings file this build cannot read is left on disk instead of being replaced
+  with defaults.
+- **Menu coverage.** Every native menu command now has a test proving it has an
+  effect, and the menu check verifies the Edit submenu and its accelerators.
 
 ## Requirements
 
