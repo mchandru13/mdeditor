@@ -84,7 +84,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 329 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
+| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 332 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
 | `Release` | a `v*` tag, or manual dispatch | builds the NSIS and MSI installers; on a tag, publishes them as a GitHub Release with checksums |
 
 A manual `Release` run builds the installers and keeps them as workflow artifacts without publishing, which is the way to test packaging changes.
@@ -344,7 +344,7 @@ Lighthouse cannot interact with the application, so this measures the **empty wo
 ## Testing
 
 ```bash
-npm test        # 329 tests (Vitest + React Testing Library, jsdom)
+npm test        # 332 tests (Vitest + React Testing Library, jsdom)
 npm run test:rust  # 36 tests (cargo test)
 ```
 
@@ -407,14 +407,14 @@ MDEDITOR_EXE="$LOCALAPPDATA/Markdown Editor/mdeditor.exe" npm run check:e2e
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
-Re-run for 1.1.0 on 2026-11-21 (Windows, Node 24.13.0): 329 Vitest tests, 39 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 3/3, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
+Re-run for 1.1.0 on 2026-11-21 (Windows, Node 24.13.0): 332 Vitest tests, 39 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 3/3, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
 
 | Check | Command | Result |
 |---|---|---|
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 329 passed |
+| Unit and integration tests | `npm test` | 332 passed |
 | Native tests | `npm run test:rust` | 36 passed |
 | File association | double-click a `.md` in Explorer | launches the app with that file; second file forwards to the running window (verified: 1 process, tab added) |
 | Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |
