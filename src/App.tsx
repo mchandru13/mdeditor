@@ -279,12 +279,31 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   /* ------------------------------------------------------------- persistence */
   useEffect(() => {
     let cancelled = false;
+    // Only arm the persistence effect when the stored settings were actually
+    // accepted, or when there were none to accept. A file this build refuses
+    // (future version, unknown shape, or a load error such as oversized) must be
+    // left untouched: parseSettings and the Rust loader both document starting
+    // from defaults *without touching it*, and marking hydration complete there
+    // would let the debounced save overwrite it and destroy its recovery data.
+    let accepted = false;
 
     void (async () => {
       try {
         const raw = await platform.loadSettings();
+        if (cancelled) return;
+
+        // No stored settings (first run, or a corrupt file the loader already
+        // backed up and removed): start from defaults and persist normally.
+        if (raw === null) {
+          accepted = true;
+          return;
+        }
+
         const parsed = parseSettings(raw);
-        if (!parsed || cancelled) return;
+        if (!parsed) {
+          setMessage('Stored settings could not be read; starting from defaults.');
+          return;
+        }
 
         setTheme(parsed.theme);
         setMode(initialMode ?? parsed.mode);
@@ -298,7 +317,12 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
             title: entry.title,
             origin: entry.origin,
             source: entry.recoverySource ?? '',
-            savedSource: entry.recoverySource === null ? null : entry.recoverySource,
+            // Recovery data is a bounded copy of an unsaved buffer, never the
+            // file's content, so it must not stand in for savedSource: that would
+            // mark a truncated tab as saved and let the next save overwrite the
+            // real file with the recovered prefix. Leaving savedSource null keeps
+            // the tab dirty, so the loader below re-reads the file from disk.
+            savedSource: null,
             encoding: entry.encoding,
           });
           restored.scroll = entry.scroll;
@@ -308,10 +332,11 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
 
         const activeId = restoredIds[parsed.activeIndex] ?? restoredIds[0];
         if (activeId) dispatch({ type: 'activate', id: activeId });
+        accepted = true;
       } catch {
         setMessage('Stored settings could not be read; starting from defaults.');
       } finally {
-        if (!cancelled) setHydrated(true);
+        if (!cancelled && accepted) setHydrated(true);
       }
     })();
 

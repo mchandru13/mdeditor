@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
-import { Compartment, EditorState } from '@codemirror/state';
+import { Compartment, EditorState, Transaction } from '@codemirror/state';
 import {
   EditorView,
   drawSelection,
@@ -9,7 +9,7 @@ import {
   keymap,
   lineNumbers,
 } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentWithTab, redo, undo, undoDepth } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
@@ -71,6 +71,13 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   const onChangeRef = useRef(onChange);
   const readOnlyCompartment = useRef(new Compartment());
   const spellCheckCompartment = useRef(new Compartment());
+  /**
+   * History lives in a compartment so a tab switch can drop it. One view is
+   * reused for every document, so without a reset the previous tab's undo events
+   * stay in the shared history and Ctrl+Z in the new tab restores the old
+   * document's text into the current buffer.
+   */
+  const historyCompartment = useRef(new Compartment());
 
   onChangeRef.current = onChange;
 
@@ -95,7 +102,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         highlightActiveLine(),
         drawSelection(),
         highlightSpecialChars(),
-        history(),
+        historyCompartment.current.of(history()),
         keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
         markdown(),
         syntaxHighlighting(highlight),
@@ -130,11 +137,18 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     if (!view || currentDocRef.current === docId) return;
 
     currentDocRef.current = docId;
+    // Drop the history extension around the swap so the outgoing document's
+    // undo events are discarded rather than mapped through the replacement.
+    // Annotating with addToHistory(false) is not enough: the history field maps
+    // the existing events through the change and they then leak the previous
+    // document's text on undo.
+    view.dispatch({ effects: historyCompartment.current.reconfigure([]) });
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: value },
       selection: { anchor: 0 },
       scrollIntoView: false,
     });
+    view.dispatch({ effects: historyCompartment.current.reconfigure(history()) });
     view.scrollDOM.scrollTop = initialScroll;
     view.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -148,10 +162,15 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     if (current === value) return;
 
     const selection = view.state.selection.main;
+    // Only the first load of a restored tab is kept out of the history, and only
+    // when there is nothing to lose: replacing the whole buffer here is also how
+    // Edit > Replace and Replace All arrive, and those must stay undoable.
+    const noHistory = undoDepth(view.state) === 0;
     view.dispatch({
       changes: { from: 0, to: current.length, insert: value },
       selection: { anchor: Math.min(selection.anchor, value.length) },
       scrollIntoView: false,
+      ...(noHistory ? { annotations: Transaction.addToHistory.of(false) } : {}),
     });
   }, [value]);
 

@@ -803,9 +803,40 @@ describe('preferences', () => {
     );
   });
 
+  it('leaves a settings file it refuses untouched instead of overwriting it', async () => {
+    // A version this build does not understand must be refused without writing,
+    // otherwise the recovery data it holds is silently destroyed on launch.
+    const settings = JSON.stringify({
+      version: 99,
+      theme: 'dark',
+      mode: 'split',
+      tocVisible: true,
+      spellCheck: true,
+      splitRatio: 0.5,
+      docs: [
+        {
+          title: 'recovered',
+          origin: { kind: 'pasted', baseDir: null },
+          recoverySource: 'RECOVERY-MARKER',
+          encoding: { bom: false, eol: '\n' },
+          scroll: { editor: 0, preview: 0 },
+        },
+      ],
+      activeIndex: 0,
+    });
+
+    const { platform } = renderApp({ settings });
+    expect(
+      await screen.findByText(/Stored settings could not be read/i),
+    ).toBeInTheDocument();
+
+    // Well past the 800 ms debounce: nothing may be written over the refused file.
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(platform.settingsWrites).toEqual([]);
+  });
+
   it('persists the workspace mode and theme', async () => {
     const { platform } = renderApp({}, 'split');
-
     fireEvent.keyDown(window, { key: '1', ctrlKey: true });
     fireEvent.change(screen.getByLabelText('Theme'), { target: { value: 'dark' } });
 

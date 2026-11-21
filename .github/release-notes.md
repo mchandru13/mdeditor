@@ -35,6 +35,9 @@ GitHub Actions from the `v{version}` tag.
 
 ## Verification
 
-Every tagged build runs the full test suite before packaging. For the checks
+A tagged build checks that the version in `package.json`, `src-tauri/Cargo.toml`
+and `src-tauri/tauri.conf.json` all agree with the tag, and the packaging step
+type-checks the frontend (`tsc --noEmit`). The Vitest and Cargo suites run in CI
+on every push and pull request, not in the release workflow. For the checks
 covered and, more importantly, the ones that are not automated, see
 [ROADMAP.md](https://github.com/mchandru13/mdeditor/blob/master/ROADMAP.md).
