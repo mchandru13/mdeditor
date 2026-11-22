@@ -1,6 +1,7 @@
 # Markdown Editor
 
 [![CI](https://github.com/mchandru13/mdeditor/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/mchandru13/mdeditor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A local-first Markdown viewer and editor for Windows, built with Tauri 2, Rust, React and TypeScript. It opens Markdown files in tabs, renders GitHub-flavoured Markdown with syntax highlighting, KaTeX math and Mermaid diagrams, and offers three workspace modes: **Read**, **Edit** and **Split**.
 
@@ -473,3 +474,8 @@ remaining work, deliberate limitations and unverified areas.
 | Blank window in the packaged app | A CSP violation. Open the WebView2 devtools (`Ctrl+Shift+I` in a debug build) and check the console; report the blocked source. |
 | Settings not saved | The app data directory may be read-only. A notice above the workspace reports the failure; unsaved buffer content is never discarded. |
 | Images missing from a preview | Relative paths resolve against the document's folder. Pasted documents without a known folder show a notice and keep paths unresolved. |
+
+## License
+
+MIT — see [LICENSE](LICENSE). Third-party libraries bundled into the installer
+keep their own licenses; this file covers the code in this repository.
