@@ -211,6 +211,10 @@ try {
       };
     });
 
+  // Start from a known level. The zoom persists, so a previous session — or the
+  // repo build and the installed copy sharing one settings.json — can leave it
+  // anywhere, and the assertions below compare against this sample.
+  await page.keyboard.press('Control+0');
   const zoomBase = await articleZoom();
   await page.keyboard.press('Control+Equal');
   await page.keyboard.press('Control+Equal');
