@@ -452,7 +452,7 @@ remaining work, deliberate limitations and unverified areas.
 - Editing a remote document and saving writes a local copy through Save As; the remote URL is never written back.
 - Session restore reads file contents lazily: only the active tab is loaded at start, others load when selected. A moved or deleted file is marked missing rather than recreated.
 - The 200 KB performance target is missed (~491 ms of pipeline time, see above). The 5 MB case is not interactive by design; the preview is opt-in.
-- `npm audit` is clean (0 vulnerabilities, checked on 2026-11-21): an `overrides` entry pins the nested `katex` that `remark-math` pulls in to the app's own patched version, which removed the duplicate advisory. Recheck after dependency updates.
+- `npm audit` is clean (0 vulnerabilities, rechecked 2026-11-22 across 681 dependencies): an `overrides` entry pins the nested `katex` that `remark-math` pulls in to the app's own patched version, which removed the duplicate advisory. Recheck after dependency updates.
 - External changes are detected when the window regains focus, not by a live filesystem watcher, so a change made while the window stays focused is noticed only after switching away and back.
 - Replace edits the Markdown source and is disabled in Read Mode; it does not rewrite rendered DOM.
 - Toggle items in the View menu do not show a check mark; the toolbar's pressed state reflects the same setting.

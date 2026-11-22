@@ -144,7 +144,7 @@ checks for full coverage.
 | Signed installer | Not done: requires a code-signing certificate and `bundle.windows.signCommand`. Until then Windows shows an unknown-publisher warning. |
 | Native menu item invocation | `check:menu` reads the menu bar, the File submenu (labels) and the Edit submenu (`Add Comment…` accelerator), but this session cannot deliver input to the window, so item *behaviour* is covered by `tests/integration/app.test.tsx` rather than end to end. |
 | Auto-update | Not implemented. Would need a release host and signing. |
-| `npm audit` | Clean as of 1.0.3 (checked 2026-11-21): an `overrides` entry pins the nested `katex` (pulled by `remark-math`) to the app's own patched version, which removed the duplicate entirely. Recheck after dependency updates. |
+| `npm audit` | Clean as of 1.1.1 (rechecked 2026-11-22 across 681 dependencies): 0 of every severity. An `overrides` entry pins the nested `katex` (pulled by `remark-math`) to the app's own patched version, which removed the duplicate entirely — verified by `npm ls katex` showing a single deduped `katex@0.19.1`. Recheck after dependency updates. |
 
 ---
 
