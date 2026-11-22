@@ -1220,3 +1220,40 @@ describe('every native menu command has an observable effect', () => {
     expect(await screen.findByRole('dialog', { name: 'About Markdown Editor' })).toBeInTheDocument();
   });
 });
+
+describe('sync scroll preference', () => {
+  it('is restored on start, not reset to the default', async () => {
+    // The bug was on load: the toggle reset to on at every restart because the
+    // value was never written. Starting from a saved payload whose syncScroll is
+    // false is the only way to catch that.
+    const saved = JSON.stringify({
+      version: 1,
+      theme: 'system',
+      mode: 'edit',
+      tocVisible: true,
+      spellCheck: true,
+      syncScroll: false,
+      splitRatio: 0.5,
+      docs: [],
+      activeIndex: 0,
+    });
+
+    const { platform } = renderApp({ settings: saved }, 'edit');
+
+    const button = await screen.findByRole('button', { name: 'Sync scroll' });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    // And it still toggles and persists once running.
+    await act(async () => {
+      platform.emitMenu('view.syncScroll');
+    });
+    await waitFor(() => expect(button).toHaveAttribute('aria-pressed', 'true'));
+    await waitFor(
+      () => {
+        const latest = platform.settingsWrites.at(-1);
+        expect(JSON.parse(latest ?? '{}')).toMatchObject({ syncScroll: true });
+      },
+      { timeout: 4000 },
+    );
+  });
+});

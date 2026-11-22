@@ -27,6 +27,7 @@ export interface PersistedSettings {
   mode: WorkspaceMode;
   tocVisible: boolean;
   spellCheck: boolean;
+  syncScroll: boolean;
   splitRatio: number;
   docs: PersistedDoc[];
   activeIndex: number;
@@ -37,6 +38,7 @@ export interface PersistedUi {
   mode: WorkspaceMode;
   tocVisible: boolean;
   spellCheck: boolean;
+  syncScroll: boolean;
   splitRatio: number;
 }
 
@@ -123,6 +125,7 @@ export function serializeSettings(
     mode: ui.mode,
     tocVisible: ui.tocVisible,
     spellCheck: ui.spellCheck,
+    syncScroll: ui.syncScroll,
     splitRatio: ui.splitRatio,
     docs: persisted,
     activeIndex,
@@ -178,6 +181,10 @@ export function parseSettings(raw: string | null): PersistedSettings | null {
     // On by default. The previous hard-disabled behaviour was wrong for prose,
     // and a writing tool should spell-check unless told otherwise.
     spellCheck: parsed.spellCheck !== false,
+    // Also on by default. Absent from files written before this was persisted,
+    // which is why the default is "not explicitly false" rather than a required
+    // field: an older settings.json must keep working.
+    syncScroll: parsed.syncScroll !== false,
     splitRatio:
       typeof parsed.splitRatio === 'number' && parsed.splitRatio > 0.15 && parsed.splitRatio < 0.85
         ? parsed.splitRatio

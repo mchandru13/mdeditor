@@ -46,3 +46,15 @@ if (typeof globalThis.IntersectionObserver === 'undefined') {
 }
 
 Element.prototype.scrollIntoView = vi.fn();
+
+// jsdom implements neither of these, and CodeMirror measures text with them.
+// Without the stubs it throws inside a requestAnimationFrame after the test has
+// finished, which Vitest reports as an unhandled error and exits non-zero even
+// though every test passed. `getClientRects` returning an empty list makes
+// CodeMirror fall back to the element's bounds.
+if (typeof Range.prototype.getClientRects !== 'function') {
+  Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+}
+if (typeof Range.prototype.getBoundingClientRect !== 'function') {
+  Range.prototype.getBoundingClientRect = () => new DOMRect();
+}

@@ -329,6 +329,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         setMode(initialMode ?? parsed.mode);
         setTocVisible(parsed.tocVisible);
         setSpellCheck(parsed.spellCheck);
+        setSyncScroll(parsed.syncScroll);
         setSplitRatio(parsed.splitRatio);
 
         const restoredIds: DocId[] = [];
@@ -373,6 +374,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         mode,
         tocVisible,
         spellCheck,
+        syncScroll,
         splitRatio,
       }, isDirty);
 
@@ -382,7 +384,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [documents, theme, mode, tocVisible, spellCheck, splitRatio, hydrated, platform]);
+  }, [documents, theme, mode, tocVisible, spellCheck, syncScroll, splitRatio, hydrated, platform]);
 
   // Load file contents for restored tabs that only had a path.
   useEffect(() => {

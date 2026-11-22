@@ -12,6 +12,7 @@ const UI = {
   mode: 'split' as const,
   tocVisible: true,
   spellCheck: true,
+  syncScroll: false,
   splitRatio: 0.4,
 };
 
@@ -170,5 +171,43 @@ describe('session parsing guards', () => {
     const parsed = parseSettings(json);
     expect(parsed?.theme).toBe('system');
     expect(parsed?.mode).toBe('split');
+  });
+});
+
+describe('sync scroll preference', () => {
+  it('survives a save/load round trip', () => {
+    const doc = createDocument({ title: 'a.md', origin: null, source: 'x', savedSource: 'x' });
+    const parsed = parseSettings(serializeSettings([doc], doc.id, UI, isDirty));
+    expect(parsed?.syncScroll).toBe(false);
+  });
+
+  it('defaults on for a settings file written before it was persisted', () => {
+    // A real 1.1.0 payload: no `syncScroll` key at all. It must keep working.
+    const legacy = JSON.stringify({
+      version: 1,
+      theme: 'dark',
+      mode: 'split',
+      tocVisible: true,
+      spellCheck: true,
+      splitRatio: 0.4,
+      docs: [],
+      activeIndex: 0,
+    });
+    expect(parseSettings(legacy)?.syncScroll).toBe(true);
+  });
+
+  it('honours an explicit false', () => {
+    const payload = JSON.stringify({
+      version: 1,
+      theme: 'dark',
+      mode: 'split',
+      tocVisible: true,
+      spellCheck: true,
+      syncScroll: false,
+      splitRatio: 0.4,
+      docs: [],
+      activeIndex: 0,
+    });
+    expect(parseSettings(payload)?.syncScroll).toBe(false);
   });
 });
