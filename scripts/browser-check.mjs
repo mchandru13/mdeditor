@@ -153,6 +153,93 @@ await page.waitForSelector('.searchbar', { state: 'detached', timeout: 5000 }).c
 const bodyText = await page.locator('.markdown-body').innerText();
 check('content survived every transition', bodyText.includes('Rendering check') && bodyText.includes('Typed live'));
 
+// ---- document zoom -----------------------------------------------------
+// Ctrl+= and Ctrl+- scale the rendered article, not the application: `zoom`
+// multiplies layout, so the computed font-size stays 15px. Measure heights, and
+// leave the editor in the comparison as the control.
+const measureArticle = () =>
+  page.evaluate(() => {
+    const article = document.querySelector('.markdown-body');
+    // Rects, not computed font sizes: a computed font-size is unchanged by CSS
+    // zoom, transform: scale and whole-webview zoom alike, so it cannot tell the
+    // document zoom from an application-wide one.
+    const size = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return 'absent';
+      const rect = element.getBoundingClientRect();
+      return `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+    };
+    return {
+      zoom: article.style.zoom,
+      height: Math.round(article.getBoundingClientRect().height),
+      editorSize: size('.cm-content'),
+      headerHeight: size('.app-header'),
+      label: document.querySelector('.zoom-value')?.textContent ?? 'absent',
+    };
+  });
+
+const zoomBase = await measureArticle();
+check(
+  'zoom starts at actual size',
+  zoomBase.zoom === '1' && zoomBase.label === '100%',
+  JSON.stringify(zoomBase),
+);
+
+await page.keyboard.press('Control+Equal');
+await page.keyboard.press('Control+Equal');
+const zoomedIn = await measureArticle();
+check(
+  'Ctrl+= enlarges the rendered page',
+  zoomedIn.zoom === '1.25' && zoomedIn.height > zoomBase.height && zoomedIn.label === '125%',
+  JSON.stringify(zoomedIn),
+);
+check(
+  'zoom leaves the editor and the chrome alone',
+  zoomedIn.editorSize === zoomBase.editorSize && zoomedIn.headerHeight === zoomBase.headerHeight,
+  `editor ${zoomBase.editorSize} -> ${zoomedIn.editorSize}, header ${zoomBase.headerHeight} -> ${zoomedIn.headerHeight}`,
+);
+
+await page.keyboard.press('Control+0');
+const zoomReset = await measureArticle();
+check(
+  'Ctrl+0 restores actual size exactly',
+  zoomReset.zoom === '1' && Math.abs(zoomReset.height - zoomBase.height) <= 1,
+  `${zoomBase.height}px -> ${zoomReset.height}px`,
+);
+
+// ---- print ignores the reading zoom -------------------------------------
+// Print styles change the same article (11pt, no max-width), so the two print
+// samples are compared with each other, never with the screen baseline.
+const printArticle = async () => {
+  await page.emulateMedia({ media: 'print' });
+  try {
+    return await page.evaluate(() => {
+      const article = document.querySelector('.markdown-body');
+      return {
+        zoom: getComputedStyle(article).zoom,
+        height: Math.round(article.getBoundingClientRect().height),
+      };
+    });
+  } finally {
+    await page.emulateMedia({ media: null });
+  }
+};
+
+const printAtActual = await printArticle();
+for (let step = 0; step < 5; step += 1) await page.keyboard.press('Control+Equal');
+// The screen level must really be 200% first, or both samples would be at 100%
+// and this check would pass with the print override removed.
+const zoomedForPrint = await measureArticle();
+const printAtDouble = await printArticle();
+check(
+  'print ignores the reading zoom',
+  zoomedForPrint.zoom === '2' &&
+    printAtDouble.zoom === '1' &&
+    Math.abs(printAtDouble.height - printAtActual.height) <= 1,
+  `screen ${zoomedForPrint.zoom}, 100%: ${printAtActual.height}px, 200%: ${printAtDouble.height}px, print computed ${printAtDouble.zoom}`,
+);
+await page.keyboard.press('Control+0');
+
 // ---- print output -------------------------------------------------------
 // The File menu advertises "Print / Export PDF", and the dialog prints whatever
 // the page looks like under print media. Verify that here, since the dialog
@@ -239,6 +326,26 @@ try {
 } finally {
   await page.emulateMedia({ media: null });
 }
+
+// ---- minimum window width ----------------------------------------------
+// The zoom stepper lives in the status bar so it has room at every supported
+// width: check it is inside the viewport and the bar does not overflow.
+await page.setViewportSize({ width: 1024, height: 700 });
+const narrow = await page.evaluate(() => {
+  const bar = document.querySelector('.statusbar');
+  const group = document.querySelector('.zoom-group');
+  return {
+    barScroll: bar.scrollWidth,
+    barClient: bar.clientWidth,
+    zoomRight: Math.round(group.getBoundingClientRect().right),
+    viewport: window.innerWidth,
+  };
+});
+check(
+  'zoom controls fit at the 1024px minimum width',
+  narrow.barScroll <= narrow.barClient && narrow.zoomRight <= narrow.viewport,
+  JSON.stringify(narrow),
+);
 
 check('no page errors', errors.length === 0, errors.join(' | '));
 

@@ -38,3 +38,28 @@ describe('shortcut mapping', () => {
     expect(shortcutForEvent(key({ key: 'm', ctrlKey: true, altKey: true }))).toBeNull();
   });
 });
+
+describe('zoom shortcuts', () => {
+  it('maps both spellings of the plus key', () => {
+    // `+` needs Shift on most layouts; the unshifted physical key reports `=`.
+    // The numeric keypad reports `+` directly. All three are the same gesture.
+    expect(shortcutForEvent(key({ key: '=', ctrlKey: true }))).toBe('mod+equal');
+    expect(shortcutForEvent(key({ key: '+', ctrlKey: true, shiftKey: true }))).toBe('mod+equal');
+    expect(shortcutForEvent(key({ key: '+', ctrlKey: true }))).toBe('mod+equal');
+  });
+
+  it('maps both spellings of the minus key', () => {
+    expect(shortcutForEvent(key({ key: '-', ctrlKey: true }))).toBe('mod+minus');
+    expect(shortcutForEvent(key({ key: '_', ctrlKey: true, shiftKey: true }))).toBe('mod+minus');
+  });
+
+  it('maps Ctrl+0 to actual size', () => {
+    expect(shortcutForEvent(key({ key: '0', ctrlKey: true }))).toBe('mod+zero');
+  });
+
+  it('does not map the zoom keys without Ctrl', () => {
+    expect(shortcutForEvent(key({ key: '+' }))).toBeNull();
+    expect(shortcutForEvent(key({ key: '-' }))).toBeNull();
+    expect(shortcutForEvent(key({ key: '0' }))).toBeNull();
+  });
+});

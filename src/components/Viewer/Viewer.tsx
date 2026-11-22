@@ -17,6 +17,9 @@ interface ViewerProps {
   onScroll?: (scrollTop: number) => void;
   /** Shared with the owner so scroll-spy and search can read the container. */
   containerRef?: RefObject<HTMLDivElement | null>;
+  /** Multiplier for the rendered page; `1` is actual size. Not applied to the
+   *  scroll container, so its padding and the Back to top button stay fixed. */
+  zoom?: number;
   children: ReactNode;
   empty?: ReactNode;
   error?: string | null;
@@ -27,7 +30,7 @@ interface ViewerProps {
  * section navigation, search and synchronized scrolling consistent.
  */
 export const Viewer = forwardRef<ViewerHandle, ViewerProps>(function Viewer(
-  { headings, onScroll, containerRef: providedRef, children, empty, error },
+  { headings, onScroll, containerRef: providedRef, children, empty, error, zoom },
   ref,
 ) {
   const internalRef = useRef<HTMLDivElement | null>(null);
@@ -74,7 +77,11 @@ export const Viewer = forwardRef<ViewerHandle, ViewerProps>(function Viewer(
       {empty ? (
         empty
       ) : (
-        <article className="markdown-body" aria-label="Document preview">
+        <article
+          className="markdown-body"
+          aria-label="Document preview"
+          style={zoom === undefined ? undefined : { zoom }}
+        >
           {children}
         </article>
       )}

@@ -69,6 +69,10 @@
     font-size: 11pt;
     line-height: 1.5;
     color: #000;
+    /* The reading zoom is an inline style on the article. Print is a document,
+       not a reading session, so it always prints at actual size; !important is
+       what lets this stylesheet override the inline value. */
+    zoom: 1 !important;
   }
 
   .markdown-body h1,

@@ -6,6 +6,8 @@ export type InfoDialogKind = 'shortcuts' | 'about';
 
 const SHORTCUTS: { keys: string; action: string }[] = [
   { keys: 'Ctrl+1 / 2 / 3', action: 'Read, Edit, Split mode' },
+  { keys: 'Ctrl++ / Ctrl+-', action: 'Zoom the document in or out' },
+  { keys: 'Ctrl+0', action: 'Reset the zoom to 100%' },
   { keys: 'Ctrl+F', action: 'Search in the document' },
   { keys: 'Ctrl+H', action: 'Search and replace' },
   { keys: 'Ctrl+Shift+M', action: 'Add a comment to the selected text' },

@@ -195,6 +195,40 @@ try {
     JSON.stringify(readText.slice(0, 80)),
   );
 
+  // --- zoom ---------------------------------------------------------------
+  // The one thing the Edge harness cannot prove: whether WebView2 itself owns
+  // Ctrl+= or Ctrl+0. Its zoom control does not document Ctrl+0, so a swallowed
+  // key would leave Actual Size dead in the packaged app while every jsdom test
+  // passed. The brand is measured too: whole-webview zoom would scale it.
+  const articleZoom = () =>
+    page.evaluate(() => {
+      const article = document.querySelector('.markdown-body');
+      const brand = document.querySelector('.brand');
+      return {
+        inline: article.style.zoom,
+        height: Math.round(article.getBoundingClientRect().height),
+        brand: Math.round(brand.getBoundingClientRect().height),
+      };
+    });
+
+  const zoomBase = await articleZoom();
+  await page.keyboard.press('Control+Equal');
+  await page.keyboard.press('Control+Equal');
+  const zoomed = await articleZoom();
+  check(
+    'Ctrl+= zooms the document, not the window',
+    zoomed.inline === '1.25' && zoomed.height > zoomBase.height && zoomed.brand === zoomBase.brand,
+    JSON.stringify({ base: zoomBase, zoomed }),
+  );
+
+  await page.keyboard.press('Control+0');
+  const zoomRestored = await articleZoom();
+  check(
+    'Ctrl+0 resets the zoom',
+    zoomRestored.inline === '1' && Math.abs(zoomRestored.height - zoomBase.height) <= 1,
+    JSON.stringify(zoomRestored),
+  );
+
   // --- comments ------------------------------------------------------------
   await page.keyboard.press('Control+3');
   await page.waitForSelector('.cm-editor', { timeout: 20000 });

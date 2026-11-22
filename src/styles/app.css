@@ -484,6 +484,11 @@ mark.search-hit-active {
 }
 
 .statusbar-path {
+  /* Shrinkable: `.statusbar-item` is flex: none, which stopped the ellipsis
+     from ever engaging and pushed the zoom controls off the right edge once a
+     long path was shown. */
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 45%;
@@ -497,6 +502,19 @@ mark.search-hit-active {
 
 .statusbar-mode {
   text-transform: capitalize;
+}
+
+/* Fixed width so the percentage does not move the + button as the number
+   changes, and digits of equal width so 100% does not jitter. */
+.zoom-value {
+  min-width: 48px;
+  font-variant-numeric: tabular-nums;
+}
+
+.zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 /* -------------------------------------------------------------------- modal */

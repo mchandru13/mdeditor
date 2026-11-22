@@ -13,6 +13,7 @@ const UI = {
   tocVisible: true,
   spellCheck: true,
   syncScroll: false,
+  zoom: 1.25,
   splitRatio: 0.4,
 };
 
@@ -97,6 +98,45 @@ describe('session serialization', () => {
       activeIndex: 0,
     });
     expect(parseSettings(json)?.splitRatio).toBe(0.5);
+  });
+});
+
+describe('zoom preference', () => {
+  const legacy = JSON.stringify({
+    version: 1,
+    theme: 'dark',
+    mode: 'split',
+    tocVisible: true,
+    spellCheck: true,
+    syncScroll: true,
+    splitRatio: 0.4,
+    docs: [],
+    activeIndex: 0,
+  });
+
+  it('survives a save/load round trip', () => {
+    const parsed = parseSettings(serializeSettings([], null, { ...UI, zoom: 1.5 }, isDirty));
+    expect(parsed?.zoom).toBe(1.5);
+  });
+
+  it('defaults to 100% for a settings file written before it was persisted', () => {
+    expect(parseSettings(legacy)?.zoom).toBe(1);
+  });
+
+  it('clamps a level outside the supported range instead of rejecting the file', () => {
+    const tooBig = JSON.parse(legacy) as Record<string, unknown>;
+    tooBig.zoom = 99;
+    expect(parseSettings(JSON.stringify(tooBig))?.zoom).toBe(2);
+
+    const tooSmall = JSON.parse(legacy) as Record<string, unknown>;
+    tooSmall.zoom = 0.01;
+    expect(parseSettings(JSON.stringify(tooSmall))?.zoom).toBe(0.5);
+  });
+
+  it('falls back to 100% when the stored level is not a number', () => {
+    const wrongType = JSON.parse(legacy) as Record<string, unknown>;
+    wrongType.zoom = '2';
+    expect(parseSettings(JSON.stringify(wrongType))?.zoom).toBe(1);
   });
 });
 

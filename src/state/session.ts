@@ -5,6 +5,7 @@
  * to be a saved file. */
 
 import type { DocOrigin, DocState, EncodingInfo, WorkspaceMode } from '../lib/types';
+import { clampZoom, DEFAULT_ZOOM } from '../lib/zoom';
 
 export const SETTINGS_VERSION = 1;
 export const RECOVERY_DOC_BYTES = 256 * 1024;
@@ -28,6 +29,7 @@ export interface PersistedSettings {
   tocVisible: boolean;
   spellCheck: boolean;
   syncScroll: boolean;
+  zoom: number;
   splitRatio: number;
   docs: PersistedDoc[];
   activeIndex: number;
@@ -39,6 +41,7 @@ export interface PersistedUi {
   tocVisible: boolean;
   spellCheck: boolean;
   syncScroll: boolean;
+  zoom: number;
   splitRatio: number;
 }
 
@@ -126,6 +129,7 @@ export function serializeSettings(
     tocVisible: ui.tocVisible,
     spellCheck: ui.spellCheck,
     syncScroll: ui.syncScroll,
+    zoom: ui.zoom,
     splitRatio: ui.splitRatio,
     docs: persisted,
     activeIndex,
@@ -185,6 +189,10 @@ export function parseSettings(raw: string | null): PersistedSettings | null {
     // which is why the default is "not explicitly false" rather than a required
     // field: an older settings.json must keep working.
     syncScroll: parsed.syncScroll !== false,
+    // Read and Split share one level. A file written before zoom existed has no
+    // field, and a value outside the ladder is clamped rather than rejected: the
+    // rest of the settings are still worth restoring.
+    zoom: typeof parsed.zoom === 'number' ? clampZoom(parsed.zoom) : DEFAULT_ZOOM,
     splitRatio:
       typeof parsed.splitRatio === 'number' && parsed.splitRatio > 0.15 && parsed.splitRatio < 0.85
         ? parsed.splitRatio

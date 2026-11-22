@@ -116,6 +116,25 @@ try {
   const viewportBox = await page.locator('.cm-editor').boundingBox();
   check('editor has non-zero height', (viewportBox?.height ?? 0) > 200, JSON.stringify(viewportBox));
 
+  // The remote URL is long and becomes the status-bar path. With `.statusbar-item`
+  // at `flex: none` that path could not shrink, and it pushed the zoom controls
+  // past the right edge.
+  const bar = await page.evaluate(() => {
+    const element = document.querySelector('.statusbar');
+    const group = document.querySelector('.zoom-group');
+    return {
+      scroll: element.scrollWidth,
+      client: element.clientWidth,
+      zoomRight: Math.round(group.getBoundingClientRect().right),
+      width: window.innerWidth,
+    };
+  });
+  check(
+    'status bar fits with a long path and the zoom controls',
+    bar.scroll <= bar.client && bar.zoomRight <= bar.width,
+    JSON.stringify(bar),
+  );
+
   check('no page errors', errors.length === 0, errors.join(' | '));
 
   // Leave the session as it was: close the document this check opened.

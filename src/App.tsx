@@ -42,6 +42,7 @@ import {
 } from './lib/search';
 import type { DocId, DocState, WorkspaceMode } from './lib/types';
 import type { RenderOutput } from './lib/markdownPipeline';
+import { DEFAULT_ZOOM, stepZoom } from './lib/zoom';
 import { RICH_CONTENT_LIMIT } from './hooks/useDocumentRender';
 import { PlatformProvider } from './platform/context';
 import { createPlatform } from './platform/choose';
@@ -84,6 +85,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const [tocVisible, setTocVisible] = useState(true);
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [syncScroll, setSyncScroll] = useState(true);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [spellCheck, setSpellCheck] = useState(true);
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -137,6 +139,26 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   const allowRemoteImages = doc ? remoteImagesAllowed.has(doc.id) : false;
   const render = useDocumentRender(doc, mode, platform, rendererRef, allowRemoteImages);
 
+  // Zoom belongs to the rendered preview. In Edit Mode, or with no document
+  // open, there is nothing to scale: stepping the level there would change what
+  // the user sees on the next mode switch with nothing to show for it now.
+  const zoomEnabled = previewMode && doc !== null;
+
+  const zoomIn = useCallback(() => {
+    if (!zoomEnabled) return;
+    setZoom((value) => stepZoom(value, 1));
+  }, [zoomEnabled]);
+
+  const zoomOut = useCallback(() => {
+    if (!zoomEnabled) return;
+    setZoom((value) => stepZoom(value, -1));
+  }, [zoomEnabled]);
+
+  const zoomReset = useCallback(() => {
+    if (!zoomEnabled) return;
+    setZoom(DEFAULT_ZOOM);
+  }, [zoomEnabled]);
+
   const loadRemoteImages = useCallback(() => {
     if (!doc) return;
     setRemoteImagesAllowed((current) => new Set(current).add(doc.id));
@@ -147,7 +169,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
   }, []);
 
   const headings = useMemo(() => render.output?.headings ?? [], [render.output]);
-  const activeHeading = useScrollSpy(viewerElementRef, headings, previewMode);
+  const activeHeading = useScrollSpy(viewerElementRef, headings, previewMode, zoom);
 
   const searchCount = mode === 'edit' ? sourceMatches.length : textMatches.length;
 
@@ -330,6 +352,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         setTocVisible(parsed.tocVisible);
         setSpellCheck(parsed.spellCheck);
         setSyncScroll(parsed.syncScroll);
+        setZoom(parsed.zoom);
         setSplitRatio(parsed.splitRatio);
 
         const restoredIds: DocId[] = [];
@@ -375,6 +398,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         tocVisible,
         spellCheck,
         syncScroll,
+        zoom,
         splitRatio,
       }, isDirty);
 
@@ -384,7 +408,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [documents, theme, mode, tocVisible, spellCheck, syncScroll, splitRatio, hydrated, platform]);
+  }, [documents, theme, mode, tocVisible, spellCheck, syncScroll, zoom, splitRatio, hydrated, platform]);
 
   // Load file contents for restored tabs that only had a path.
   useEffect(() => {
@@ -892,6 +916,10 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         setReplaceVisible(true);
         setSearchOpen(true);
       },
+      // Read and Split with a document open; the callbacks no-op otherwise.
+      'mod+equal': zoomIn,
+      'mod+minus': zoomOut,
+      'mod+zero': zoomReset,
       'mod+s': () => {
         const current = activeDocument(stateRef.current);
         if (current) void saveDocument(current);
@@ -912,7 +940,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         else if (urlDialogOpen) setUrlDialogOpen(false);
       },
     }),
-    [closeDocument, closeSearch, newDocument, openFromDialog, saveDocument, searchOpen, urlDialogOpen, startComment, commentDialog],
+    [closeDocument, closeSearch, newDocument, openFromDialog, saveDocument, searchOpen, urlDialogOpen, startComment, commentDialog, zoomIn, zoomOut, zoomReset],
   );
 
   useShortcuts(shortcuts);
@@ -1150,6 +1178,15 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
         case 'view.syncScroll':
           setSyncScroll((value) => !value);
           break;
+        case 'view.zoomIn':
+          zoomIn();
+          break;
+        case 'view.zoomOut':
+          zoomOut();
+          break;
+        case 'view.zoomReset':
+          zoomReset();
+          break;
         case 'view.theme.light':
           setTheme('light');
           break;
@@ -1183,6 +1220,9 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
     editComment,
     removeComment,
     removeAllComments,
+    zoomIn,
+    zoomOut,
+    zoomReset,
   ]);
   /* ------------------------------------------------------- external changes */
 
@@ -1374,6 +1414,7 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
                   <Viewer
                     ref={viewerRef}
                     containerRef={viewerElementRef}
+                    zoom={zoom}
                     headings={headings}
                     error={render.error}
                     onScroll={onViewerScroll}
@@ -1423,7 +1464,11 @@ export function App({ platform: providedPlatform, initialMode }: AppProps) {
           stats={render.output?.stats ?? null}
           mode={mode}
           rendering={render.rendering}
-          message={null}
+          zoom={zoom}
+          zoomEnabled={zoomEnabled}
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onZoomReset={zoomReset}
         />
 
         {commentDialog ? (

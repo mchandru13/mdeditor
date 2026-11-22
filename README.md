@@ -84,7 +84,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 337 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
+| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 368 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
 | `Release` | a `v*` tag, or manual dispatch | builds the NSIS and MSI installers; on a tag, publishes them as a GitHub Release with checksums |
 
 A manual `Release` run builds the installers and keeps them as workflow artifacts without publishing, which is the way to test packaging changes.
@@ -133,7 +133,7 @@ A native Windows menu bar exposes every action and its accelerator:
 |---|---|
 | File | New (Ctrl+N), Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, Print / Export PDF… (Ctrl+P), Exit |
 | Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F), Replace… (Ctrl+H), Add Comment… (Ctrl+Shift+M), Edit Comment…, Remove Comment, Remove All Comments |
-| View | Read Mode (Ctrl+1), Edit Mode (Ctrl+2), Split Mode (Ctrl+3), Toggle Contents, Toggle Sync Scroll, Toggle Spell Check, Theme ▸ Light / Dark / System |
+| View | Read Mode (Ctrl+1), Edit Mode (Ctrl+2), Split Mode (Ctrl+3), Toggle Contents, Toggle Sync Scroll, Toggle Spell Check, Zoom In, Zoom Out, Actual Size, Theme ▸ Light / Dark / System |
 | Help | Keyboard Shortcuts, About Markdown Editor |
 
 The menu, the toolbar and the keyboard shortcuts all call the same handlers, so behaviour cannot drift between them. Cut/Copy/Paste/Select All are predefined OS items and therefore apply to whatever currently has focus. Toggle items do not show a check mark; the toolbar's pressed state and the View menu act on the same underlying setting.
@@ -173,11 +173,13 @@ The installer adds the entry under `OpenWithProgids`; Windows may still ask whic
 
 | Mode | Shortcut | Behaviour |
 |---|---|---|
-| Read | Ctrl+1 | Rendered document, table of contents, search, reading statistics |
+| Read | Ctrl+1 | Rendered document, table of contents, search, zoom, reading statistics |
 | Edit | Ctrl+2 | CodeMirror 6 source editor with line numbers and Markdown highlighting |
 | Split | Ctrl+3 | Editor and preview side by side, draggable divider, 150 ms render debounce, optional synchronised scrolling |
 
 Switching modes never reloads from disk, never discards edits and never creates a new document. Unsaved changes are preserved for every tab and shown as a dot on the tab.
+
+**Zoom.** Read and Split share one level. *Ctrl++* / *Ctrl+-* step the rendered page through 50%, 67%, 75%, 80%, 90%, 100%, 110%, 125%, 150%, 175% and 200%, the status bar's −, + and percentage controls do the same, and the percentage button resets to 100% (*Ctrl+0*). It scales the document — text, tables, code, math and diagrams — not the application chrome, and the level is remembered between sessions. The range stops at 200% because `zoom` scales the available width too: in Split Mode at the smallest window a 300% page reflows to a handful of characters per line. Edit Mode has no preview, so the controls are disabled there.
 
 ### Keyboard shortcuts
 
@@ -185,6 +187,9 @@ Switching modes never reloads from disk, never discards edits and never creates 
 |---|---|
 | Ctrl+N | New document |
 | Ctrl+1 / Ctrl+2 / Ctrl+3 | Read / Edit / Split |
+| Ctrl++ / Ctrl+= | Zoom the document in |
+| Ctrl+- | Zoom the document out |
+| Ctrl+0 | Reset the zoom to 100% |
 | Ctrl+F | Search in the current document |
 | Ctrl+H | Find and replace |
 | Ctrl+Shift+M | Add a comment to the selected text |
@@ -272,7 +277,7 @@ print dialog; that dialog is also how a PDF is produced — choose *Microsoft Pr
 to PDF* as the printer. The application does not write the PDF itself and does not
 claim one was written.
 
-It prints the rendered document, so switch to **Read** or **Split** Mode first:
+The reading zoom is a screen aid: the print stylesheet forces it back to 100%, so a page zoomed to 200% prints at its normal size. It prints the rendered document, so switch to **Read** or **Split** Mode first:
 Edit Mode has no preview, and `print.css` hides the editor, so printing from Edit
 Mode yields no document body. Writing a `.pdf` directly, without the dialog, is
 deliberately not implemented; see `ROADMAP.md`.
@@ -356,8 +361,8 @@ Lighthouse cannot interact with the application, so this measures the **empty wo
 ## Testing
 
 ```bash
-npm test        # 337 tests (Vitest + React Testing Library, jsdom)
-npm run test:rust  # 36 tests (cargo test)
+npm test        # 368 tests (Vitest + React Testing Library, jsdom)
+npm run test:rust  # 43 tests (cargo test)
 ```
 
 Coverage:
@@ -376,7 +381,7 @@ Two Playwright scripts exercise the real UI in Edge (the same Chromium engine as
 
 ```bash
 npm run preview          # in one terminal
-npm run check:ui         # 24 assertions against http://localhost:4173
+npm run check:ui         # 30 assertions against http://localhost:4173
 ```
 
 ```bash
@@ -386,7 +391,7 @@ npm run check:e2e        # full session against the packaged app
 npm run check:security   # attack probes against the packaged app
 ```
 
-`check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, replace-all, the TOC, and zero page errors. It also emulates print media and asserts the print output: chrome hidden, the document at the top of the page, rendered text rather than Markdown source, the light colour scheme, and `break-inside: avoid` on blocks. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
+`check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, replace-all, the TOC, and zero page errors. It also steps the document zoom with the keyboard and asserts the rendered page grows, the editor does not, Ctrl+0 restores it exactly, and print ignores it. It emulates print media and asserts the print output: chrome hidden, the document at the top of the page, rendered text rather than Markdown source, the light colour scheme, and `break-inside: avoid` on blocks. Finally it checks the zoom controls fit inside the status bar at the 1024px minimum window width. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
 
 `check:e2e` drives the packaged application through a full editing session: it writes a temporary Markdown file, opens it with `--file`, renders it, types into the editor, replaces text through the find-and-replace UI, saves with Ctrl+S and verifies the bytes on disk, modifies the file from outside and confirms the reload, adds a comment with `Ctrl+Shift+M`, checks the annotation renders and reaches the file, undoes it with Ctrl+Z, copies rendered HTML, and switches to Read Mode. Native dialogs (file picker, print, export destination) are the only part of the flow that cannot be automated.
 
@@ -419,21 +424,21 @@ MDEDITOR_EXE="$LOCALAPPDATA/Markdown Editor/mdeditor.exe" npm run check:e2e
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
-Re-run for 1.1.1 on 2026-11-22 (Windows, Node 24.13.0): 337 Vitest tests, 40 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 5/5, `check:ui` 24/24, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
+The 1.1.1 snapshot (2026-11-22) was 337 Vitest tests, 40 Rust tests and `check:ui` 24/24. The table below is the current branch: 368 Vitest tests, 43 Rust tests and `check:ui` 30/30.
 
 | Check | Command | Result |
 |---|---|---|
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 337 passed |
-| Native tests | `npm run test:rust` | 36 passed |
+| Unit and integration tests | `npm test` | 368 passed |
+| Native tests | `npm run test:rust` | 43 passed |
 | File association | double-click a `.md` in Explorer | launches the app with that file; second file forwards to the running window (verified: 1 process, tab added) |
-| Browser rendering check | `npm run check:ui` | 24/24 assertions passed against the production bundle, including replace-all and the print output |
-| Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
-| End-to-end session | `npm run check:e2e` | 18/18: open via `--file`, render, edit, replace, save to disk, external reload, add a comment by keyboard, confirm it renders and is written to the file, undo it, copy HTML, mode switch |
+| Browser rendering check | `npm run check:ui` | 30/30 assertions passed against the production bundle, including replace-all, document zoom and the print output |
+| Packaged app rendering check | `npm run check:app` | 11/11 assertions passed inside WebView2, including a restored local-file tab and a long document path that must not push the zoom controls off the status bar |
+| End-to-end session | `npm run check:e2e` | 20/20: open via `--file`, render, edit, replace, save to disk, external reload, add a comment by keyboard, confirm it renders and is written to the file, undo it, copy HTML, zoom with `Ctrl+=` and reset with `Ctrl+0` in real WebView2 (the brand must not scale, so it is the document and not the window), mode switch |
 | Security check | `npm run check:security` | 13/13: Mermaid link cannot navigate the webview, remote images are not fetched until opt-in, hostile Markdown stays inert, only canonical comment blocks are tagged (a comment cannot hide real content or reach the outline), the window still closes |
-| Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation); the File submenu offers **Print / Export PDF…** and still has Export HTML; the Edit submenu contains **Add Comment…** and its native accelerator reads `Ctrl+Shift+M`. Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
+| Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation); the File submenu offers **Print / Export PDF…** and still has Export HTML; the Edit submenu contains **Add Comment…** and its native accelerator reads `Ctrl+Shift+M`. Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. Last passed 5/5 on 1.1.1; not re-run on this build, because UI Automation hung expanding a submenu and had to be killed. The zoom commands' presence in the View menu is covered by `cargo test menu::`. |
 | Desktop release build | `npm run tauri:build` | passed; NSIS and MSI installers produced |
 | Packaged app boot | run `src-tauri/target/release/mdeditor.exe` | process stayed alive, React mounted, and `%APPDATA%\com.rea.mdeditor\settings.json` was written through IPC with the expected defaults |
 | Benchmark | `npm run bench` | see Performance: 200 KB in ~491 ms of pipeline time, 5 MB in ~24 s |
@@ -465,5 +470,5 @@ remaining work, deliberate limitations and unverified areas.
 | `failed to run 'cargo metadata' ... program not found` | `cargo` is not on `PATH`. Add `%USERPROFILE%\.cargo\bin` and open a new terminal. |
 | `link.exe not found` during `cargo build` | Install Visual Studio 2022 Build Tools with the C++ workload and Windows 11 SDK. |
 | Blank window in the packaged app | A CSP violation. Open the WebView2 devtools (`Ctrl+Shift+I` in a debug build) and check the console; report the blocked source. |
-| Settings not saved | The app data directory may be read-only. The status bar reports the failure; unsaved buffer content is never discarded. |
+| Settings not saved | The app data directory may be read-only. A notice above the workspace reports the failure; unsaved buffer content is never discarded. |
 | Images missing from a preview | Relative paths resolve against the document's folder. Pasted documents without a known folder show a notice and keep paths unresolved. |

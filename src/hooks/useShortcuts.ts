@@ -7,6 +7,9 @@ export type ShortcutName =
   | 'mod+3'
   | 'mod+f'
   | 'mod+h'
+  | 'mod+equal'
+  | 'mod+minus'
+  | 'mod+zero'
   | 'mod+shift+m'
   | 'mod+s'
   | 'mod+shift+s'
@@ -38,6 +41,13 @@ export function shortcutForEvent(event: KeyboardEvent): ShortcutName | null {
   if (key === '3') return 'mod+3';
   if (key === 'f') return 'mod+f';
   if (key === 'h') return 'mod+h';
+  // Document zoom. Both spellings matter: `+` needs Shift on most layouts and
+  // the unshifted physical key reports `=`, while the numeric keypad reports
+  // `+` and `-` directly. A layout where Shift is part of the character reports
+  // `_` for the same physical key as `-`.
+  if (key === '=' || key === '+') return 'mod+equal';
+  if (key === '-' || key === '_') return 'mod+minus';
+  if (key === '0') return 'mod+zero';
   // Ctrl+Shift+M, the accelerator the menu advertises.
   //
   // Deliberately not Ctrl+Alt+M: on layouts where Ctrl+Alt is AltGr the OS

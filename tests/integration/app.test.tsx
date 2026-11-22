@@ -1287,3 +1287,169 @@ describe('print and export PDF naming', () => {
     expect(row?.textContent).toContain('Print / Export PDF');
   });
 });
+
+describe('document zoom', () => {
+  /** The article is the only element that carries the reading zoom. */
+  async function openRead(text = '# Title\n\nBody\n') {
+    const result = renderApp({ clipboard: text }, 'read');
+    fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
+    const article = await screen.findByRole('article', { name: 'Document preview' });
+    return { article, ...result };
+  }
+
+  it('steps the page from the toolbar and resets through the percentage', async () => {
+    const { article } = await openRead();
+    expect(article.style.zoom).toBe('1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    expect(article.style.zoom).toBe('1.1');
+    expect(screen.getByLabelText('Zoom 110%; reset to 100%')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+    expect(article.style.zoom).toBe('0.9');
+
+    fireEvent.click(screen.getByLabelText('Zoom 90%; reset to 100%'));
+    expect(article.style.zoom).toBe('1');
+  });
+
+  it('steps on every key press, including the shifted spelling of plus', async () => {
+    const { article } = await openRead();
+
+    // Twice from 100% is 125%, not 110%: a handler that captured a stale level
+    // would apply one step however many times it was pressed.
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true });
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true });
+    expect(article.style.zoom).toBe('1.25');
+
+    fireEvent.keyDown(window, { key: '+', ctrlKey: true, shiftKey: true });
+    expect(article.style.zoom).toBe('1.5');
+
+    fireEvent.keyDown(window, { key: '-', ctrlKey: true });
+    fireEvent.keyDown(window, { key: '-', ctrlKey: true });
+    expect(article.style.zoom).toBe('1.1');
+
+    fireEvent.keyDown(window, { key: '0', ctrlKey: true });
+    expect(article.style.zoom).toBe('1');
+  });
+
+  it('answers the three View menu commands', async () => {
+    const { article, platform } = await openRead();
+
+    await act(async () => {
+      platform.emitMenu('view.zoomIn');
+    });
+    expect(article.style.zoom).toBe('1.1');
+
+    await act(async () => {
+      platform.emitMenu('view.zoomOut');
+    });
+    expect(article.style.zoom).toBe('1');
+
+    await act(async () => {
+      platform.emitMenu('view.zoomIn');
+    });
+    await act(async () => {
+      platform.emitMenu('view.zoomReset');
+    });
+    expect(article.style.zoom).toBe('1');
+  });
+
+  it('leaves the level alone in Edit Mode', async () => {
+    renderApp({ clipboard: '# Title\n' }, 'edit');
+    fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
+    await screen.findByLabelText('Markdown source editor');
+
+    // Nothing is rendered, so the controls are disabled...
+    expect(screen.getByRole('button', { name: 'Zoom in' })).toBeDisabled();
+
+    // ...and the shortcut must not change the stored level either, or the next
+    // switch to Read would show a document the user never zoomed.
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true });
+    fireEvent.keyDown(window, { key: '1', ctrlKey: true });
+
+    const article = await screen.findByRole('article', { name: 'Document preview' });
+    expect(article.style.zoom).toBe('1');
+  });
+
+  it('scales the document, not the scroll container', async () => {
+    const { article } = await openRead();
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+
+    const viewer = screen.getByRole('region', { name: 'Rendered document' });
+    expect(viewer.style.zoom).toBe('');
+    expect(article.style.zoom).toBe('1.1');
+  });
+
+  it('restores the stored level and writes changes back', async () => {
+    const saved = JSON.stringify({
+      version: 1,
+      theme: 'system',
+      mode: 'read',
+      tocVisible: true,
+      spellCheck: true,
+      syncScroll: true,
+      zoom: 1.5,
+      splitRatio: 0.5,
+      docs: [],
+      activeIndex: 0,
+    });
+
+    const { platform } = renderApp({ settings: saved, clipboard: '# Title\n' }, 'read');
+    fireEvent.click(await screen.findByRole('button', { name: 'From clipboard' }));
+    const article = await screen.findByRole('article', { name: 'Document preview' });
+    expect(article.style.zoom).toBe('1.5');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    await waitFor(
+      () => {
+        const latest = platform.settingsWrites.at(-1);
+        expect(JSON.parse(latest ?? '{}')).toMatchObject({ zoom: 1.75 });
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it('keeps a non-default level across Read, Edit and back', async () => {
+    await openRead();
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true });
+    fireEvent.keyDown(window, { key: '=', ctrlKey: true });
+    expect(screen.getByLabelText('Zoom 125%; reset to 100%')).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: '2', ctrlKey: true });
+    await screen.findByLabelText('Markdown source editor');
+
+    fireEvent.keyDown(window, { key: '1', ctrlKey: true });
+    const again = await screen.findByRole('article', { name: 'Document preview' });
+    expect(again.style.zoom).toBe('1.25');
+  });
+
+  it('disables the step with nowhere to go', async () => {
+    const { article } = await openRead();
+
+    for (let step = 0; step < 8; step += 1) fireEvent.keyDown(window, { key: '-', ctrlKey: true });
+    expect(article.style.zoom).toBe('0.5');
+    expect(screen.getByRole('button', { name: 'Zoom out' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Zoom in' })).not.toBeDisabled();
+
+    for (let step = 0; step < 10; step += 1) fireEvent.keyDown(window, { key: '=', ctrlKey: true });
+    expect(article.style.zoom).toBe('2');
+    expect(screen.getByRole('button', { name: 'Zoom in' })).toBeDisabled();
+  });
+
+  it('does nothing with no document open', async () => {
+    renderApp({}, 'read');
+    // Nothing rendered to scale, so the controls cannot pretend otherwise.
+    expect(await screen.findByRole('button', { name: 'Zoom in' })).toBeDisabled();
+  });
+
+  it('does not leak the level into copied HTML', async () => {
+    const { platform } = await openRead();
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy HTML' }));
+
+    await waitFor(() => expect(platform.copied).toHaveLength(1));
+    // The article's style is on the wrapper, and the export copies its children.
+    expect(platform.copied[0]).not.toContain('zoom');
+  });
+});
