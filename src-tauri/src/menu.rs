@@ -133,7 +133,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[test]
     fn print_names_the_pdf_export_it_provides() {
         // `window.print()` is the only PDF path there is (the system dialog's
         // "Microsoft Print to PDF"). The label is where a user looks for it, and
@@ -142,10 +141,9 @@ mod tests {
             .iter()
             .find(|command| command.id == "file.print")
             .expect("file.print is declared");
-        assert!(
-            print.label.contains("Export PDF"),
-            "file.print reads {:?}; the menu is the only place Export PDF is discoverable",
-            print.label
+        assert_eq!(
+            print.label, "Print / Export PDF…",
+            "the menu is the only place Export PDF is discoverable"
         );
         assert_eq!(
             print.accelerator,

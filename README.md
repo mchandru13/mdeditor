@@ -119,7 +119,7 @@ The workflow refuses to publish when the tag and the three version fields disagr
 | `npm run clean` | Reclaims `src-tauri/target/` space, keeping the dependency cache (see AGENTS.md) |
 | `npm run check:ui` | Playwright smoke test against the production bundle (needs `npm run preview` on :4173) |
 | `npm run check:app` | Playwright + CDP smoke test against the packaged desktop app |
-| `npm run check:menu` | Windows UI Automation check of the native menu bar and the Edit submenu |
+| `npm run check:menu` | Windows UI Automation check of the native menu bar, the File and Edit submenus, and the Add Comment accelerator |
 | `npm run check:e2e` | End-to-end run of the packaged app: open, edit, replace, save, external change, comment, undo, modes |
 | `npm run check:security` | Attacks the packaged app: navigation escape, remote-image beaconing, hostile Markdown, comment spoofing |
 
@@ -131,7 +131,7 @@ A native Windows menu bar exposes every action and its accelerator:
 
 | Menu | Items |
 |---|---|
-| File | New (Ctrl+N), Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, **Print / Export PDF…** (Ctrl+P), Exit |
+| File | New (Ctrl+N), Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, Print / Export PDF… (Ctrl+P), Exit |
 | Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F), Replace… (Ctrl+H), Add Comment… (Ctrl+Shift+M), Edit Comment…, Remove Comment, Remove All Comments |
 | View | Read Mode (Ctrl+1), Edit Mode (Ctrl+2), Split Mode (Ctrl+3), Toggle Contents, Toggle Sync Scroll, Toggle Spell Check, Theme ▸ Light / Dark / System |
 | Help | Keyboard Shortcuts, About Markdown Editor |
@@ -267,10 +267,14 @@ Open files are checked for modification when the window regains focus. A clean t
 Light, dark and system themes are available from the toolbar; System mode follows OS changes. All colours come from `src/styles/tokens.css`. Printing uses `src/styles/print.css`, which removes application chrome and adds sensible page-break behaviour.
 
 **Print / Export PDF…** (Ctrl+P, or the toolbar's Print button) opens the system
-print dialog. That dialog is also how a PDF is produced: choose *Microsoft Print
-to PDF* as the printer. The application does not write the PDF itself — it opens
-the dialog and does not claim a PDF was written. Writing a `.pdf` directly,
-without the dialog, is deliberately not implemented; see `ROADMAP.md`.
+print dialog; that dialog is also how a PDF is produced — choose *Microsoft Print
+to PDF* as the printer. The application does not write the PDF itself and does not
+claim one was written.
+
+It prints the rendered document, so switch to **Read** or **Split** Mode first:
+Edit Mode has no preview, and `print.css` hides the editor, so printing from Edit
+Mode yields no document body. Writing a `.pdf` directly, without the dialog, is
+deliberately not implemented; see `ROADMAP.md`.
 
 ### Export
 
@@ -414,7 +418,7 @@ MDEDITOR_EXE="$LOCALAPPDATA/Markdown Editor/mdeditor.exe" npm run check:e2e
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
-Re-run for 1.1.0 on 2026-11-21 (Windows, Node 24.13.0): 332 Vitest tests, 39 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 3/3, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
+Re-run for 1.1.0 on 2026-11-21 (Windows, Node 24.13.0): 332 Vitest tests, 40 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 5/5, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
 
 | Check | Command | Result |
 |---|---|---|
@@ -428,7 +432,7 @@ Re-run for 1.1.0 on 2026-11-21 (Windows, Node 24.13.0): 332 Vitest tests, 39 Rus
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
 | End-to-end session | `npm run check:e2e` | 18/18: open via `--file`, render, edit, replace, save to disk, external reload, add a comment by keyboard, confirm it renders and is written to the file, undo it, copy HTML, mode switch |
 | Security check | `npm run check:security` | 13/13: Mermaid link cannot navigate the webview, remote images are not fetched until opt-in, hostile Markdown stays inert, only canonical comment blocks are tagged (a comment cannot hide real content or reach the outline), the window still closes |
-| Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation), the Edit submenu contains **Add Comment…**, and its native accelerator reads `Ctrl+Shift+M`. Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
+| Native menu check | `npm run check:menu` | File/Edit/View/Help present in the packaged window (UI Automation); the File submenu offers **Print / Export PDF…** and still has Export HTML; the Edit submenu contains **Add Comment…** and its native accelerator reads `Ctrl+Shift+M`. Item invocation is not automatable from this session; dispatch is covered by the menu-command tests. |
 | Desktop release build | `npm run tauri:build` | passed; NSIS and MSI installers produced |
 | Packaged app boot | run `src-tauri/target/release/mdeditor.exe` | process stayed alive, React mounted, and `%APPDATA%\com.rea.mdeditor\settings.json` was written through IPC with the expected defaults |
 | Benchmark | `npm run bench` | see Performance: 200 KB in ~491 ms of pipeline time, 5 MB in ~24 s |

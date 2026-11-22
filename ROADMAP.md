@@ -5,8 +5,8 @@ application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
 
-Current state: 332 TypeScript tests and 39 Rust tests pass (2026-11-21), and all
-five packaged-app checks were re-run on this build: `check:menu` 3/3, `check:ui`
+Current state: 332 TypeScript tests and 40 Rust tests pass (2026-11-21), and all
+five packaged-app checks were re-run on this build: `check:menu` 5/5, `check:ui`
 18/18, `check:app` 10/10, `check:e2e` 18/18 and `check:security` 13/13. File
 associations for `.md` and `.markdown` are registered by the installer and
 verified by double-click and second-instance forwarding.
@@ -124,7 +124,7 @@ trade-off, so each needs an explicit decision.
 | Chunked parsing replicates reference definitions into each chunk | Keeps links working across boundaries; costs a little extra parse work on definition-heavy files | A two-pass parse that resolves definitions globally before rendering |
 | Tabs are capped at 50 with a confirmation prompt | Prevents unbounded session files and memory growth | Raise or remove the limit; check session size and restore time |
 | Comments are block-form only, one blockquote after the annotated paragraph | Inline markers such as `{==text==}{>>note<<}` do not survive the Markdown parser: a note containing `$`, `*`, `[` or `|` degrades to literal text, so it would silently break for exactly the notes worth writing | A custom remark plugin with a dedicated inline node type, plus formatting, escaping and sanitizer work |
-| Export PDF opens the system print dialog; no `.pdf` is written directly | The dialog is the documented PDF path (spec §10.3, §11.3) and the print stylesheet already yields the document; writing the file ourselves needs WebView2's `ICoreWebView2_16::PrintToPdf` through `with_webview`, i.e. raw COM (`unsafe`, a refcounted callback, and a resolve-after-callback command shape) plus two new dependencies | Confine the `unsafe` to a small `#[cfg(windows)]` module, have the completion callback resolve an async command instead of blocking the UI thread (blocking inside `with_webview` deadlocks: the callback runs there), and cover it with a test that writes and re-reads a real file |
+| Export PDF opens the system print dialog; no `.pdf` is written directly | The dialog is the documented PDF path (spec §10.3, §11.3) and the print stylesheet already yields the document; writing the file ourselves needs WebView2's `ICoreWebView2_7::PrintToPdf` through `with_webview`, i.e. raw COM (`unsafe`, a refcounted callback, and a resolve-after-callback command shape) plus two new dependencies | Confine the `unsafe` to a small `#[cfg(windows)]` module, have the completion callback resolve an async command instead of blocking the UI thread (blocking inside `with_webview` deadlocks: the callback runs there), and cover it with a test that writes and re-reads a real file |
 | Comments have no ids or status, and no inline-comment form | Editing and removal by menu and right-click exist, but a comment can only be anchored to a whole paragraph, and it has no identity to reply to or resolve | An anchor model (content hash or persisted id) for status/targeting, and a custom remark plugin for inline comments |
 
 ---
@@ -141,7 +141,7 @@ checks for full coverage.
 | Export "Save as" dialog | Not automated. `buildStandaloneHtml` is covered by tests; the final dialog is not. |
 | Drag-and-drop from Explorer | Covered at the platform-interface level (fake platform) but not from a real Explorer drag. |
 | Signed installer | Not done: requires a code-signing certificate and `bundle.windows.signCommand`. Until then Windows shows an unknown-publisher warning. |
-| Native menu item invocation | `check:menu` reads the menu bar and the Edit submenu and checks the `Add Comment…` accelerator, but this session cannot deliver input to the window, so item *behaviour* is covered by `tests/integration/app.test.tsx` rather than end to end. |
+| Native menu item invocation | `check:menu` reads the menu bar, the File submenu (labels) and the Edit submenu (`Add Comment…` accelerator), but this session cannot deliver input to the window, so item *behaviour* is covered by `tests/integration/app.test.tsx` rather than end to end. |
 | Auto-update | Not implemented. Would need a release host and signing. |
 | `npm audit` | Clean as of 1.0.3 (checked 2026-11-21): an `overrides` entry pins the nested `katex` (pulled by `remark-math`) to the app's own patched version, which removed the duplicate entirely. Recheck after dependency updates. |
 
