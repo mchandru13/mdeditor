@@ -84,7 +84,7 @@ Two GitHub Actions workflows live in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 332 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
+| `CI` | every push to `master`, pull requests, manual dispatch | type-check, lint, 337 tests, production build, and `check:ui` in Edge — plus `cargo test` in a second job |
 | `Release` | a `v*` tag, or manual dispatch | builds the NSIS and MSI installers; on a tag, publishes them as a GitHub Release with checksums |
 
 A manual `Release` run builds the installers and keeps them as workflow artifacts without publishing, which is the way to test packaging changes.
@@ -192,6 +192,7 @@ Switching modes never reloads from disk, never discards edits and never creates 
 | Ctrl+S | Save |
 | Ctrl+Shift+S | Save As |
 | Ctrl+O | Open file |
+| Ctrl+P | Print / Export PDF |
 | Ctrl+W | Close tab |
 | Escape | Dismiss search or a dialog |
 
@@ -266,7 +267,7 @@ Open files are checked for modification when the window regains focus. A clean t
 
 Light, dark and system themes are available from the toolbar; System mode follows OS changes. All colours come from `src/styles/tokens.css`. Printing uses `src/styles/print.css`, which removes application chrome and adds sensible page-break behaviour.
 
-**Print / Export PDF…** (Ctrl+P, or the toolbar's Print button) opens the system
+**Print / Export PDF…** (Ctrl+P, or the toolbar's Print button, whose tooltip names both) opens the system
 print dialog; that dialog is also how a PDF is produced — choose *Microsoft Print
 to PDF* as the printer. The application does not write the PDF itself and does not
 claim one was written.
@@ -355,7 +356,7 @@ Lighthouse cannot interact with the application, so this measures the **empty wo
 ## Testing
 
 ```bash
-npm test        # 332 tests (Vitest + React Testing Library, jsdom)
+npm test        # 337 tests (Vitest + React Testing Library, jsdom)
 npm run test:rust  # 36 tests (cargo test)
 ```
 
@@ -418,14 +419,14 @@ MDEDITOR_EXE="$LOCALAPPDATA/Markdown Editor/mdeditor.exe" npm run check:e2e
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
-Re-run for 1.1.1 on 2026-11-22 (Windows, Node 24.13.0): 332 Vitest tests, 40 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 5/5, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
+Re-run for 1.1.1 on 2026-11-22 (Windows, Node 24.13.0): 337 Vitest tests, 40 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 5/5, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
 
 | Check | Command | Result |
 |---|---|---|
 | Type checking | `npm run typecheck` | passed, no diagnostics |
 | Linting | `npm run lint` | passed, 0 errors, 0 warnings |
 | Frontend production build | `npm run build` | passed; largest lazy chunks are Mermaid (~1.5 MB) and KaTeX fonts (~380 kB), both loaded on demand |
-| Unit and integration tests | `npm test` | 332 passed |
+| Unit and integration tests | `npm test` | 337 passed |
 | Native tests | `npm run test:rust` | 36 passed |
 | File association | double-click a `.md` in Explorer | launches the app with that file; second file forwards to the running window (verified: 1 process, tab added) |
 | Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |

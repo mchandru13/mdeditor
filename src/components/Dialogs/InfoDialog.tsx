@@ -14,7 +14,7 @@ const SHORTCUTS: { keys: string; action: string }[] = [
   { keys: 'Ctrl+Shift+S', action: 'Save As' },
   { keys: 'Ctrl+O', action: 'Open file' },
   { keys: 'Ctrl+W', action: 'Close tab' },
-  { keys: 'Ctrl+P', action: 'Print' },
+  { keys: 'Ctrl+P', action: 'Print / Export PDF' },
   { keys: 'Escape', action: 'Dismiss search or dialog' },
 ];
 

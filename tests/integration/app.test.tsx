@@ -1257,3 +1257,33 @@ describe('sync scroll preference', () => {
     );
   });
 });
+
+describe('print and export PDF naming', () => {
+  /**
+   * One action, one name.
+   *
+   * The File menu says "Print / Export PDF…", the toolbar button says "Print" and
+   * the shortcut list used to say "Print" — three labels for the same handler,
+   * which is what made "Export PDF" hard to find in the first place. The toolbar
+   * keeps a short label but has to name it in its tooltip; the shortcut list uses
+   * the full name. Nothing asserted any of this before, so it could drift again
+   * silently.
+   */
+  it('names the PDF export consistently across the surfaces a user sees', async () => {
+    const { platform } = await openFromClipboard('# doc\n');
+
+    // Toolbar: short label, full name in the tooltip.
+    const button = screen.getByRole('button', { name: 'Print' });
+    expect(button).toHaveAttribute('title', 'Print / Export PDF (Ctrl+P)');
+
+    // Shortcut list: the full name, next to its key.
+    await act(async () => {
+      platform.emitMenu('help.shortcuts');
+    });
+    const shortcuts = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' });
+    const row = [...shortcuts.querySelectorAll('tr')].find((tr) =>
+      tr.textContent?.includes('Ctrl+P'),
+    );
+    expect(row?.textContent).toContain('Print / Export PDF');
+  });
+});

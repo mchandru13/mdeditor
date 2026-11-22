@@ -72,7 +72,15 @@ export function Toolbar({
       </div>
 
       <div className="toolbar-group">
-        <button type="button" className="button" onClick={onPrint} disabled={!hasDocument}>
+        <button
+          type="button"
+          className="button"
+          onClick={onPrint}
+          disabled={!hasDocument}
+          // The menu calls this "Print / Export PDF…"; a toolbar button needs a
+          // short label, so the full name goes in the tooltip, like Ctrl+S above.
+          title="Print / Export PDF (Ctrl+P)"
+        >
           Print
         </button>
         <button type="button" className="button" onClick={onExportHtml} disabled={!hasDocument}>
