@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright-core';
 
@@ -10,6 +11,8 @@ import { chromium } from 'playwright-core';
  * runs — no OS input required. Covers the About box version and the comment
  * entry in the shortcut list.
  */
+// Read rather than hardcoded, so this check does not need editing per release.
+const VERSION = JSON.parse(readFileSync('package.json', 'utf8')).version;
 const EXE = resolve(process.env.MDEDITOR_EXE ?? 'src-tauri/target/release/mdeditor.exe');
 const PORT = 9341;
 const child = spawn(EXE, [], {
@@ -79,7 +82,7 @@ try {
   check('Help > About opens', aboutText.open, `opened=${about}`);
   check(
     'About shows the shipped version, not a stale literal',
-    /Markdown Editor\s+1\.1\.0/.test(aboutText.text) && !/1\.0\.0/.test(aboutText.text),
+    aboutText.text.includes(`Markdown Editor ${VERSION}`) && !/\b1\.0\.0\b/.test(aboutText.text),
     JSON.stringify(aboutText.text.slice(0, 160)),
   );
 
