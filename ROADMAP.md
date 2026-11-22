@@ -1,6 +1,6 @@
 # Roadmap
 
-Remaining work after Markdown Editor 1.1.0. Nothing here blocks normal use: the
+Remaining work after Markdown Editor 1.1.1. Nothing here blocks normal use: the
 application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
@@ -11,7 +11,8 @@ five packaged-app checks were re-run on this build: `check:menu` 5/5, `check:ui`
 associations for `.md` and `.markdown` are registered by the installer and
 verified by double-click and second-instance forwarding.
 
-1.1.0 adds comments stored in the document, with editing and removal from the
+1.1.1 names Export PDF in the File menu, persists the sync-scroll toggle and makes
+the menu check read the File submenu. 1.1.0 adds comments stored in the document, with editing and removal from the
 Edit menu and from a right-click on a rendered comment. It also fixes three ways
 a session could lose data: a restored tab started out marked Saved (so Ctrl+S
 could write the truncated recovery copy over the original), undo leaked one tab's

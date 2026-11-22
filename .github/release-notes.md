@@ -26,23 +26,28 @@ GitHub Actions from the `v{version}` tag.
 
 ## What changed in {version}
 
+- **Export PDF is now named in the File menu.** *Print / Export PDF…* (Ctrl+P)
+  opens the system print dialog; choose *Microsoft Print to PDF* to write the
+  PDF. It prints the rendered document, so use Read or Split Mode — Edit Mode has
+  no preview. The application does not write the PDF itself and does not claim
+  one was written.
+- **Toggle Sync Scroll survives a restart.** It was the one preference that reset
+  at every launch; the others already persisted.
+- **The menu check now reads the File submenu too**, so a renamed or missing
+  export command is caught before release rather than by a user.
+
+Unchanged from 1.1.0, and still the reason to upgrade if you are on 1.0.3:
+
 - **Comments, stored in the file.** Select text and choose **Edit → Add
   Comment…** or press **Ctrl+Shift+M** (or right-click the selection). The note
   is written into the Markdown as a `> [!comment]` blockquote, so an assistant
   or another editor reading the file sees it beside the text it annotates.
-  Comments are excluded from search, word counts and exported HTML, and one
-  Ctrl+Z removes them.
 - **Managing comments.** Right-click a rendered comment to **Edit** or **Remove**
-  it, or use Edit → Edit Comment…, Remove Comment and Remove All Comments. Every
-  removal is a single undoable step.
-- **Fewer ways to lose work.** A restored tab no longer starts out marked Saved,
-  which could let Ctrl+S overwrite the original file with the truncated recovery
-  copy. Undo no longer leaks the previous tab's text into the current one. A
-  settings file this build cannot read is left on disk instead of being replaced
-  with defaults.
-- **Verified menu commands.** Every native menu command now has a test proving it
-  has an effect, and the menu check reads the Edit submenu and its accelerators
-  out of the packaged binary.
+  it, or use Edit → Edit Comment…, Remove Comment and Remove All Comments.
+- **Fewer ways to lose work.** A restored tab no longer starts out marked Saved
+  (which could let Ctrl+S overwrite the file with a truncated recovery copy),
+  undo no longer leaks one tab's text into another, and a settings file this
+  build cannot read is left on disk instead of being replaced with defaults.
 
 ## Requirements
 

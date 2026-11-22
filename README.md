@@ -12,7 +12,7 @@ Every published build is a GitHub Release:
 
 | Release | Installer | Notes |
 |---|---|---|
-| [v1.1.0](https://github.com/mchandru13/mdeditor/releases/tag/v1.1.0) | `Markdown Editor_1.1.0_x64-setup.exe` | Per-user install, no admin prompt; adds comments stored in the document |
+| [v1.1.1](https://github.com/mchandru13/mdeditor/releases/tag/v1.1.1) | `Markdown Editor_1.1.1_x64-setup.exe` | Per-user install, no admin prompt; names Export PDF in the File menu and persists the sync-scroll toggle |
 
 Earlier versions are on the [releases page](https://github.com/mchandru13/mdeditor/releases).
 
@@ -418,7 +418,7 @@ MDEDITOR_EXE="$LOCALAPPDATA/Markdown Editor/mdeditor.exe" npm run check:e2e
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
-Re-run for 1.1.0 on 2026-11-21 (Windows, Node 24.13.0): 332 Vitest tests, 40 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 5/5, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
+Re-run for 1.1.1 on 2026-11-22 (Windows, Node 24.13.0): 332 Vitest tests, 40 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 5/5, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
 
 | Check | Command | Result |
 |---|---|---|
