@@ -17,6 +17,9 @@ const SAMPLE = `# Rendering check
 
 A paragraph with **bold**, *italic* and \`inline code\`.
 
+> a quoted paragraph, so the print stylesheet's page-break rule for blockquotes
+> has something to apply to.
+
 ## Table
 
 | A | B |
@@ -149,6 +152,93 @@ await page.waitForSelector('.searchbar', { state: 'detached', timeout: 5000 }).c
 
 const bodyText = await page.locator('.markdown-body').innerText();
 check('content survived every transition', bodyText.includes('Rendering check') && bodyText.includes('Typed live'));
+
+// ---- print output -------------------------------------------------------
+// The File menu advertises "Print / Export PDF", and the dialog prints whatever
+// the page looks like under print media. Verify that here, since the dialog
+// itself is a native modal that cannot be driven.
+//
+// Read `innerText` as well as computed styles: display checks alone let a
+// stylesheet that hides the *document* pass, and they miss a regression that
+// leaves the source editor visible (which happened: `.pane` further down the
+// file beat `.pane-editor` at equal specificity, so printing from Split Mode
+// included the editor gutter and raw Markdown).
+await page.emulateMedia({ media: 'screen' });
+const onScreen = await page.evaluate(() => {
+  const style = (selector) => {
+    const element = document.querySelector(selector);
+    return element ? getComputedStyle(element) : null;
+  };
+  return {
+    header: style('.app-header')?.display ?? 'absent',
+    blockRule: style('.markdown-body blockquote')?.breakInside ?? 'absent',
+  };
+});
+
+try {
+  await page.emulateMedia({ media: 'print' });
+  const print = await page.evaluate(() => {
+    const display = (selector) => {
+      const element = document.querySelector(selector);
+      return element ? getComputedStyle(element).display : 'absent';
+    };
+    const body = document.querySelector('.markdown-body');
+    const rect = body?.getBoundingClientRect();
+    return {
+      displays: {
+        '.app-header': display('.app-header'),
+        '.tabbar': display('.tabbar'),
+        '.statusbar': display('.statusbar'),
+        '.pane-editor': display('.pane-editor'),
+      },
+      // Read-mode/Split-mode chrome is conditional, so assert what is present.
+      bodyTop: rect ? Math.round(rect.top) : null,
+      bodyHeight: rect ? Math.round(rect.height) : null,
+      colour: body ? getComputedStyle(body).color : 'absent',
+      text: document.body.innerText ?? '',
+      pageBreak: document.querySelector('.markdown-body blockquote')
+        ? getComputedStyle(document.querySelector('.markdown-body blockquote')).breakInside
+        : 'absent',
+    };
+  });
+
+  check(
+    'print media is actually applied',
+    onScreen.header !== 'none' && print.displays['.app-header'] === 'none',
+    `screen=${onScreen.header} print=${print.displays['.app-header']}`,
+  );
+  check(
+    'print hides every piece of chrome',
+    Object.entries(print.displays)
+      .filter(([selector]) => selector !== '.pane-editor')
+      .every(([, value]) => value === 'none') && print.displays['.pane-editor'] === 'none',
+    JSON.stringify(print.displays),
+  );
+  check(
+    'print shows the document, at the top of the page',
+    print.bodyHeight !== null && print.bodyHeight > 0 && print.bodyTop === 0,
+    `top=${print.bodyTop} height=${print.bodyHeight}`,
+  );
+  // The rendered document, not its source: no gutter numbers, no Markdown
+  // syntax. This is the assertion that catches the editor leaking into print.
+  check(
+    'print contains rendered text, not source',
+    print.text.includes('Rendering check') && !/\*\*bold\*\*/.test(print.text) && !/\|\s*A\s*\|/.test(print.text),
+    JSON.stringify(print.text.slice(0, 80)),
+  );
+  check(
+    'print applies the light colour scheme',
+    print.colour === 'rgb(0, 0, 0)',
+    print.colour,
+  );
+  check(
+    'print keeps blocks from splitting across pages',
+    print.pageBreak === 'avoid' && onScreen.blockRule === 'auto',
+    `print=${print.pageBreak} screen=${onScreen.blockRule}`,
+  );
+} finally {
+  await page.emulateMedia({ media: null });
+}
 
 check('no page errors', errors.length === 0, errors.join(' | '));
 

@@ -1,3 +1,7 @@
+/* Loaded after tokens.css and viewer.css from main.tsx, and it must stay that
+   way: `:root` here and `[data-theme='dark']` in tokens.css have equal
+   specificity, so the print colours win only by source order. Moving this import
+   earlier makes a dark theme print as light grey on white. */
 @media print {
   :root {
     --bg: #ffffff;
@@ -9,6 +13,10 @@
     --border-strong: #999999;
   }
 
+  /* Everything that is application chrome rather than document. `.pane-editor`
+     is listed again below as `.pane.pane-editor`: the element carries both
+     classes, and the `.pane` rule further down would otherwise win, printing the
+     source editor above the document. */
   .app-header,
   .tabbar,
   .statusbar,
@@ -18,10 +26,20 @@
   .divider,
   .code-block-bar,
   .back-to-top,
-  .pane-editor,
   .large-doc,
   .modal-backdrop,
-  .viewer-error {
+  .viewer-error,
+  /* Not document content: a warning and its "Load images" button, the
+     right-click menu, and the empty/loading states. */
+  .remote-images,
+  .context-menu,
+  .pane-empty,
+  .empty-state,
+  .viewer-loading {
+    display: none !important;
+  }
+
+  .pane.pane-editor {
     display: none !important;
   }
 

@@ -376,7 +376,7 @@ Two Playwright scripts exercise the real UI in Edge (the same Chromium engine as
 
 ```bash
 npm run preview          # in one terminal
-npm run check:ui         # 18 assertions against http://localhost:4173
+npm run check:ui         # 24 assertions against http://localhost:4173
 ```
 
 ```bash
@@ -386,7 +386,7 @@ npm run check:e2e        # full session against the packaged app
 npm run check:security   # attack probes against the packaged app
 ```
 
-`check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, replace-all, the TOC, and zero page errors. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
+`check:ui` loads a document through the clipboard and asserts headings, tables, highlighting, task lists, the code copy button, KaTeX, Mermaid SVG, non-zero preview height, live preview updates after typing, all three mode transitions, search counts, replace-all, the TOC, and zero page errors. It also emulates print media and asserts the print output: chrome hidden, the document at the top of the page, rendered text rather than Markdown source, the light colour scheme, and `break-inside: avoid` on blocks. `check:app` launches `mdeditor.exe` with WebView2 remote debugging, verifies that a restored local-file tab renders, opens a real HTTPS Markdown document through the Rust fetch command, asserts the same rendering surface in Split Mode, then closes the tab it opened and restores the previous mode so the user's session is left as it was.
 
 `check:e2e` drives the packaged application through a full editing session: it writes a temporary Markdown file, opens it with `--file`, renders it, types into the editor, replaces text through the find-and-replace UI, saves with Ctrl+S and verifies the bytes on disk, modifies the file from outside and confirms the reload, adds a comment with `Ctrl+Shift+M`, checks the annotation renders and reaches the file, undoes it with Ctrl+Z, copies rendered HTML, and switches to Read Mode. Native dialogs (file picker, print, export destination) are the only part of the flow that cannot be automated.
 
@@ -419,7 +419,7 @@ MDEDITOR_EXE="$LOCALAPPDATA/Markdown Editor/mdeditor.exe" npm run check:e2e
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
-Re-run for 1.1.1 on 2026-11-22 (Windows, Node 24.13.0): 337 Vitest tests, 40 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 5/5, `check:ui` 18/18, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
+Re-run for 1.1.1 on 2026-11-22 (Windows, Node 24.13.0): 337 Vitest tests, 40 Rust tests, typecheck, lint, and `npm audit` (0 vulnerabilities) all pass. All five packaged checks were re-run on this build (`check:menu` 5/5, `check:ui` 24/24, `check:app` 10/10, `check:e2e` 18/18, `check:security` 13/13).
 
 | Check | Command | Result |
 |---|---|---|
@@ -429,7 +429,7 @@ Re-run for 1.1.1 on 2026-11-22 (Windows, Node 24.13.0): 337 Vitest tests, 40 Rus
 | Unit and integration tests | `npm test` | 337 passed |
 | Native tests | `npm run test:rust` | 36 passed |
 | File association | double-click a `.md` in Explorer | launches the app with that file; second file forwards to the running window (verified: 1 process, tab added) |
-| Browser rendering check | `npm run check:ui` | 18/18 assertions passed against the production bundle, including replace-all |
+| Browser rendering check | `npm run check:ui` | 24/24 assertions passed against the production bundle, including replace-all and the print output |
 | Packaged app rendering check | `npm run check:app` | 10/10 assertions passed inside WebView2, including a restored local-file tab |
 | End-to-end session | `npm run check:e2e` | 18/18: open via `--file`, render, edit, replace, save to disk, external reload, add a comment by keyboard, confirm it renders and is written to the file, undo it, copy HTML, mode switch |
 | Security check | `npm run check:security` | 13/13: Mermaid link cannot navigate the webview, remote images are not fetched until opt-in, hostile Markdown stays inert, only canonical comment blocks are tagged (a comment cannot hide real content or reach the outline), the window still closes |

@@ -138,7 +138,7 @@ checks for full coverage.
 | Gap | Status |
 |---|---|
 | Native file picker | Not automated. The CLI path, file association and drag-and-drop are covered; the OS dialog is not. |
-| Print dialog output | Not automated. The stylesheet is unit-tested indirectly; the dialog result is unverified. |
+| Print dialog output | The *output surface* is now automated: `check:ui` emulates print media and asserts chrome hidden, document at the top, rendered text rather than source, light colours and `break-inside: avoid`. What remains unverified is the native dialog itself and whether a PDF lands on disk — it is a modal that CDP cannot drive, so that needs a human clicking *Save as PDF*. |
 | Export "Save as" dialog | Not automated. `buildStandaloneHtml` is covered by tests; the final dialog is not. |
 | Drag-and-drop from Explorer | Covered at the platform-interface level (fake platform) but not from a real Explorer drag. |
 | Signed installer | Not done: requires a code-signing certificate and `bundle.windows.signCommand`. Until then Windows shows an unknown-publisher warning. |
