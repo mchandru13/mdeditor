@@ -131,7 +131,7 @@ A native Windows menu bar exposes every action and its accelerator:
 
 | Menu | Items |
 |---|---|
-| File | New (Ctrl+N), Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, Print… (Ctrl+P), Exit |
+| File | New (Ctrl+N), Open… (Ctrl+O), Open from URL…, New from Clipboard, Save (Ctrl+S), Save As… (Ctrl+Shift+S), Export HTML…, **Print / Export PDF…** (Ctrl+P), Exit |
 | Edit | Undo (Ctrl+Z), Redo (Ctrl+Y), Cut, Copy, Paste, Select All, Find… (Ctrl+F), Replace… (Ctrl+H), Add Comment… (Ctrl+Shift+M), Edit Comment…, Remove Comment, Remove All Comments |
 | View | Read Mode (Ctrl+1), Edit Mode (Ctrl+2), Split Mode (Ctrl+3), Toggle Contents, Toggle Sync Scroll, Toggle Spell Check, Theme ▸ Light / Dark / System |
 | Help | Keyboard Shortcuts, About Markdown Editor |
@@ -264,7 +264,13 @@ Open files are checked for modification when the window regains focus. A clean t
 
 ### Theming and printing
 
-Light, dark and system themes are available from the toolbar; System mode follows OS changes. All colours come from `src/styles/tokens.css`. Printing uses `src/styles/print.css`, which removes application chrome and adds sensible page-break behaviour. The print dialog is opened; the application does not claim a PDF was written.
+Light, dark and system themes are available from the toolbar; System mode follows OS changes. All colours come from `src/styles/tokens.css`. Printing uses `src/styles/print.css`, which removes application chrome and adds sensible page-break behaviour.
+
+**Print / Export PDF…** (Ctrl+P, or the toolbar's Print button) opens the system
+print dialog. That dialog is also how a PDF is produced: choose *Microsoft Print
+to PDF* as the printer. The application does not write the PDF itself — it opens
+the dialog and does not claim a PDF was written. Writing a `.pdf` directly,
+without the dialog, is deliberately not implemented; see `ROADMAP.md`.
 
 ### Export
 

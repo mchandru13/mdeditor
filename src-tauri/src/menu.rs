@@ -38,7 +38,7 @@ pub const COMMANDS: &[Command] = &[
     Command { id: "file.saveAs", label: "Save As…", accelerator: Some("CmdOrCtrl+Shift+S") },
     Command { id: SEPARATOR, label: SEPARATOR, accelerator: None },
     Command { id: "file.exportHtml", label: "Export HTML…", accelerator: None },
-    Command { id: "file.print", label: "Print…", accelerator: Some("CmdOrCtrl+P") },
+    Command { id: "file.print", label: "Print / Export PDF…", accelerator: Some("CmdOrCtrl+P") },
     Command { id: SEPARATOR, label: SEPARATOR, accelerator: None },
     Command { id: "file.exit", label: "Exit", accelerator: None },
     Command { id: "edit.undo", label: "Undo", accelerator: Some("CmdOrCtrl+Z") },
@@ -131,6 +131,28 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 mod tests {
     //! Assertions about the menu description, runnable without a window.
     use super::*;
+
+    #[test]
+    #[test]
+    fn print_names_the_pdf_export_it_provides() {
+        // `window.print()` is the only PDF path there is (the system dialog's
+        // "Microsoft Print to PDF"). The label is where a user looks for it, and
+        // a label is cheap to change silently — so pin it.
+        let print = COMMANDS
+            .iter()
+            .find(|command| command.id == "file.print")
+            .expect("file.print is declared");
+        assert!(
+            print.label.contains("Export PDF"),
+            "file.print reads {:?}; the menu is the only place Export PDF is discoverable",
+            print.label
+        );
+        assert_eq!(
+            print.accelerator,
+            Some("CmdOrCtrl+P"),
+            "the accelerator must not change with the label"
+        );
+    }
 
     #[test]
     fn every_command_has_a_namespaced_id_and_a_label() {
