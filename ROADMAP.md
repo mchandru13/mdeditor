@@ -1,6 +1,6 @@
 # Roadmap
 
-Remaining work after Markdown Editor 1.1.1. Nothing here blocks normal use: the
+Remaining work after Markdown Editor 1.1.2. Nothing here blocks normal use: the
 application builds, runs and passes its automated checks. Items are grouped by
 whether they are defects, deliberate limits, or enhancements that were considered
 and consciously deferred.
@@ -13,8 +13,12 @@ to be killed — and last passed 5/5 on 1.1.1. File associations for `.md` and
 `.markdown` are registered by the installer and verified by double-click and
 second-instance forwarding.
 
-1.1.1 names Export PDF in the File menu, persists the sync-scroll toggle and makes
-the menu check read the File submenu. 1.1.0 adds comments stored in the document, with editing and removal from the
+1.1.2 adds document zoom to Read and Split Mode (Ctrl++ / Ctrl+-, Ctrl+0, the
+status-bar stepper and three View commands), fixes printing from Split Mode
+including the source editor's gutter and raw Markdown above the document, fixes
+the outline highlight after scrolling, and stops a long path from pushing the
+zoom controls off the status bar. 1.1.1 names Export PDF in the File menu,
+persists the sync-scroll toggle and makes the menu check read the File submenu. 1.1.0 adds comments stored in the document, with editing and removal from the
 Edit menu and from a right-click on a rendered comment. It also fixes three ways
 a session could lose data: a restored tab started out marked Saved (so Ctrl+S
 could write the truncated recovery copy over the original), undo leaked one tab's

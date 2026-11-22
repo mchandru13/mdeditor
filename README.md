@@ -12,6 +12,7 @@ Every published build is a GitHub Release:
 
 | Release | Installer | Notes |
 |---|---|---|
+| [v1.1.2](https://github.com/mchandru13/mdeditor/releases/tag/v1.1.2) | `Markdown Editor_1.1.2_x64-setup.exe` | Read/Split zoom (Ctrl++ / Ctrl+- / Ctrl+0), printing from Split Mode no longer includes the source editor, correct outline highlight while scrolling |
 | [v1.1.1](https://github.com/mchandru13/mdeditor/releases/tag/v1.1.1) | `Markdown Editor_1.1.1_x64-setup.exe` | Per-user install, no admin prompt; names Export PDF in the File menu and persists the sync-scroll toggle |
 
 Earlier versions are on the [releases page](https://github.com/mchandru13/mdeditor/releases).
@@ -424,7 +425,7 @@ MDEDITOR_EXE="$LOCALAPPDATA/Markdown Editor/mdeditor.exe" npm run check:e2e
 
 Everything below was executed on the reference machine (11th Gen Intel Core i5-11320H, 16 GB RAM, Windows, Node 24.13.0, Rust 1.100.0).
 
-The 1.1.1 snapshot (2026-11-22) was 337 Vitest tests, 40 Rust tests and `check:ui` 24/24. The table below is the current branch: 368 Vitest tests, 43 Rust tests and `check:ui` 30/30.
+The 1.1.1 snapshot (2026-11-22) was 337 Vitest tests, 40 Rust tests and `check:ui` 24/24. The table below is 1.1.2: 368 Vitest tests, 43 Rust tests and `check:ui` 30/30.
 
 | Check | Command | Result |
 |---|---|---|

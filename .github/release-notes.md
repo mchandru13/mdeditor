@@ -26,15 +26,18 @@ GitHub Actions from the `v{version}` tag.
 
 ## What changed in {version}
 
-- **Export PDF is now named in the File menu.** *Print / Export PDF…* (Ctrl+P)
-  opens the system print dialog; choose *Microsoft Print to PDF* to write the
-  PDF. It prints the rendered document, so use Read or Split Mode — Edit Mode has
-  no preview. The application does not write the PDF itself and does not claim
-  one was written.
-- **Toggle Sync Scroll survives a restart.** It was the one preference that reset
-  at every launch; the others already persisted.
-- **The menu check now reads the File submenu too**, so a renamed or missing
-  export command is caught before release rather than by a user.
+- **Zoom in Read and Split Mode.** *Ctrl++* / *Ctrl+-* scale the rendered page
+  like a PDF reader — text, tables, code, math and diagrams together — through
+  50% to 200%, and *Ctrl+0* returns to actual size. The same controls sit in the
+  status bar and in **View → Zoom In / Zoom Out / Actual Size**, and the level is
+  remembered between sessions. The source editor, the application chrome and the
+  printed page stay at their own sizes.
+- **Printing from Split Mode prints only the document.** A stylesheet ordering
+  bug let the source editor's line-number gutter and raw Markdown print above
+  the rendered page; *Print / Export PDF…* now produces the document alone, and
+  the browser check asserts the print output.
+- **The outline follows you while scrolling**, including at 200%, and a long file
+  path no longer pushes the zoom controls off the status bar.
 
 Unchanged from 1.1.0, and still the reason to upgrade if you are on 1.0.3:
 
