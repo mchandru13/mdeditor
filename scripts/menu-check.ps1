@@ -11,7 +11,14 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 
-$exe = Resolve-Path 'src-tauri/target/release/mdeditor.exe'
+# MDEDITOR_EXE points at an installed copy, which is what a user runs; the
+# default is the build in this checkout.
+$exe = if ($env:MDEDITOR_EXE) {
+  (Resolve-Path $env:MDEDITOR_EXE).Path
+}
+else {
+  (Resolve-Path 'src-tauri/target/release/mdeditor.exe').Path
+}
 $proc = Start-Process -FilePath $exe -PassThru
 Start-Sleep -Seconds 6
 
@@ -150,6 +157,30 @@ catch {
 }
 finally {
   if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+}
+
+# File menu labels.
+#
+# Read from the binary rather than by expanding the menu: UI Automation's Expand()
+# blocks indefinitely on some submenus here, and a check that hangs is worse than
+# one that skips. Labels are compiled in as UTF-16 literals, so this is exact and
+# races nothing. It proves the strings shipped; that they are attached to the
+# right items is covered by cargo test menu:: (the COMMANDS table).
+try {
+  $bytes = [System.IO.File]::ReadAllBytes($exe)
+  # The literals are UTF-8 in the binary, not UTF-16.
+  $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+  foreach ($needed in @('Print / Export PDF', 'Export HTML')) {
+    if ($text.Contains($needed)) {
+      $results.Add("PASS  File menu ships '$needed'")
+    }
+    else {
+      $results.Add("FAIL  '$needed' is not in the binary")
+    }
+  }
+}
+catch {
+  $results.Add("FAIL  could not read the binary: $($_.Exception.Message)")
 }
 
 $results | ForEach-Object { Write-Output $_ }
